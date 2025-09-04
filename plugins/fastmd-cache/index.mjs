@@ -118,9 +118,7 @@ export default function fastmdCache(userOptions = {}) {
 
 function createState(userOptions) {
   const env = process.env;
-  const enabled = env.FASTMD_DISABLE
-    ? !truthy(env.FASTMD_DISABLE)
-    : (userOptions.enabled ?? true);
+  const enabled = env.FASTMD_DISABLE ? !truthy(env.FASTMD_DISABLE) : (userOptions.enabled ?? true);
   const logLevel = env.FASTMD_LOG || userOptions.log || 'summary';
   const cacheDir = path.resolve(
     process.cwd(),
