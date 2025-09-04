@@ -1,0 +1,112 @@
+meta:
+  title: FastMD Phase 1 Spec (Full-output Cache / MVP)
+  version: 1.0.0
+  date: 2025-09-04
+  owners: ["fast-md-x maintainers"]
+  context: "Node.js 22 / Linux, macOS, Windows / Astro+Vite 優先、Nuxt は同一 Vite プラグインを注入"
+
+goals:
+  objective: ".md/.mdx の最終 JS モジュールを丸ごとキャッシュして無変更時はゼロ処理"
+  success_criteria:
+    - "無変更再ビルド: 全ファイル HIT（ログで確認）"
+    - "単一変更: 当該のみ MISS、他は HIT"
+    - "出力一致: 既存生成物と同一（許容差分内）"
+
+scope:
+  in: ["Vite transform での .md/.mdx", "Astro（Vite 経由）", "Nuxt（Vite プラグイン注入）"]
+  out: ["差分レンダ", "部分キャッシュ（ハイライト/数式/画像）", "HTML リライト", "依存グラフ最適化", "CLI"]
+
+architecture:
+  plugin:
+    name: fastmd-cache
+    enforce: pre
+    hooks: [configResolved, buildStart, transform, handleHotUpdate, buildEnd]
+    principle: "既存パイプの最終出力を改変しない（互換重視）"
+  pipeline: ".md/.mdx -> [fastmd-cache(pre)] -> HIT:直返 / MISS:既存パイプ実行 -> 最終JS -> 保存"
+
+cache:
+  key:
+    normalize:
+      newline: "CRLF→LF、BOM 除去"
+      path: "root 相対、POSIX '/', 小文字、クエリ除去"
+    inputs: [contentLF, frontmatterNorm, featuresDigest, toolchainDigest, pathDigest]
+    algo: sha256-hex
+    configDigest: "正規化 YAML 全体の SHA256（安全側）"
+  value:
+    data: "最終 JS モジュール文字列"
+    map: "存在すれば .map を併置"
+    meta:
+      version: "内部スキーマ"
+      createdAt: ISO-8601
+      toolchainDigest: string
+      featuresDigest: string
+      sizeBytes: number
+      durationMs: number
+  storage:
+    dir: .cache/fastmd
+    layout:
+      data: "data/<key>.js(.map)"
+      meta: "meta/<key>.json"
+    write: "tmp に書き rename でアトミック。既存は上書きしない（先着勝ち）"
+    concurrent: "同一キー競合は先着のみ書込、後発は読んで返す"
+  invalidation:
+    on_change: [content, frontmatter, features, toolchain, library_version, configDigest]
+  persistence:
+    ci_hint: "actions/cache 等で .cache/fastmd を保存（鍵に OS/lockfile/configDigest を採用）"
+  manual_ops:
+    clearCache: [all, byPath, byKey]
+    warmup: "files[] を事前生成（任意）"
+
+config:
+  priority: ["ENV(FASTMD_*)", "プラグイン引数", "YAML env[NODE_ENV]", "YAML ルート", "既定値"]
+  keys:
+    - "enabled:boolean (default:true) keyImpact:false — 無効ならプラグイン完全バイパス"
+    - "cacheDir:string (default:.cache/fastmd) keyImpact:false — 保存場所のみ"
+    - "persist:boolean (default:false) keyImpact:false — CI 再利用意図"
+    - "log:enum[silent|summary|verbose] (default:summary) keyImpact:false"
+    - "features:object (default:{}) keyImpact:true — 出力に影響するフラグ集合"
+    - "clearCacheOnConfigChange:boolean (default:false) keyImpact:false — 設定変更で物理削除"
+
+logging:
+  levels: [silent, summary, verbose]
+  line_example: "HIT 3ms src/pages/guide.mdx | MISS(new) 48ms src/content/a.md"
+  summary_fields: [total, hitRate, missRate, p50, p95, failures, mode, os]
+  miss_reasons: [new, content-changed, features-changed, toolchain-changed, version-bumped, io-error]
+
+runtime_behaviors:
+  dev: "無変更は即 HIT、単一変更は当該のみ MISS。HMR は Vite 既定に委譲"
+  build: "Warm 状態で高 HIT 率、サマリを出力"
+  sourcemap: "受領時のみ保存・返却。形式は元出力に追随"
+
+acceptance:
+  functionality: ["HIT/MISS 正判定・保存・再利用", "3OS でキー一致（LF/パス差吸収）"]
+  performance: ["無変更 HIT≥99%（代表26本）", "単一変更は当該のみ MISS、ウォール時間短縮"]
+  compatibility: ["返す JS が既存と一致", "不具合時は外せば即復帰"]
+
+test_plan:
+  unit: ["改行/パス/frontmatter 正規化", "キー安定性", "アトミック書込 先着勝ち"]
+  integration: ["Cold→Warm→Single-change", "依存更新で toolchainDigest 失効"]
+  cross_os: ["Ubuntu/macOS/Windows でキー同一", "CI 復元で Warm 開始"]
+
+rollout:
+  default_enabled: true
+  staged: "必要時は enabled:false で計測のみ（Phase0）"
+  rollback: ["プラグイン除去", ".cache/fastmd 削除"]
+
+risks:
+  - "OS 差でキー不一致 -> LF/小文字/POSIX パスをキー計算前に統一"
+  - "同時書込競合 -> tmp→rename のアトミック運用・先着勝ち"
+  - "キャッシュ肥大 -> Phase1 は無制限、Phase2 で LRU/上限導入"
+
+nuxt:
+  approach: "同一 Vite プラグインを `nuxt.config` の `vite.plugins` に注入"
+  status: "Phase 1 はこれで十分。Content 連携は後段"
+
+implementation_steps:
+  - "[cfg-loader] YAML/ENV/引数を解決し configDigest を算出"
+  - "[keygen] LF/パス/frontmatter 正規化→features/toolchain ダイジェスト→SHA256 キー生成"
+  - "[io-layer] data/meta 読み書きAPI・tmp→rename アトミック・先着勝ち"
+  - "[vite-plugin] enforce:'pre' transform で HIT/MISS 判定・保存・返却・ログ"
+  - "[telemetry] summary/verbose ログ・MISS理由・p50/p95 計測"
+  - "[nuxt-wire] Nuxt の vite.plugins にプラグイン注入（手順化）"
+  - "[docs-dod] README に DoD/トラブルシュート/ロールバックを最小追記"
