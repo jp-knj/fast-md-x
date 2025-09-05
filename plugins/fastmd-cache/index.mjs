@@ -133,15 +133,25 @@ export default function fastmdCache(userOptions = {}) {
  */
 function createState(userOptions) {
   const env = process.env;
-  const enabled = env.FASTMD_DISABLE ? !truthy(env.FASTMD_DISABLE) : (userOptions.enabled ?? true);
-  const logLevel = env.FASTMD_LOG || userOptions.log || 'summary';
-  const cacheDir = path.resolve(
-    process.cwd(),
-    env.FASTMD_CACHE_DIR || userOptions.cacheDir || '.cache/fastmd'
-  );
-  const features = userOptions.features || {};
+  const root = process.cwd();
+
+  // Load YAML config (root + env[NODE_ENV])
+  const yaml = loadYamlConfigSync(root);
+  const nodeEnv = env.NODE_ENV || 'development';
+  const yamlRoot = pickKnownConfig(yaml.root);
+  const yamlEnv = pickKnownConfig(yaml.env[nodeEnv] || {});
+
+  // Compose: YAML root -> YAML env -> options -> ENV (highest)
+  const base = mergeConfig(yamlRoot, yamlEnv);
+  const withOpts = mergeConfig(base, pickKnownConfig(userOptions || {}));
+  const withEnv = applyEnvOverrides(withOpts, env);
+
+  const enabled = withEnv.enabled ?? true;
+  const logLevel = withEnv.log ?? 'summary';
+  const cacheDir = path.resolve(root, withEnv.cacheDir ?? '.cache/fastmd');
+  const features = withEnv.features ?? {};
   return {
-    root: process.cwd(),
+    root,
     enabled,
     logLevel,
     cacheDir,
@@ -446,9 +456,120 @@ function resolveConfigDigestSync(state) {
   state.configDigest = '';
 }
 
+/**
+ * Read YAML config from fastmd.config.yml/yaml and return a structured object.
+ * Supports a simplified subset: root keys and one-level nested maps under `env` and `features`.
+ * @param {string} rootDir
+ */
+function loadYamlConfigSync(rootDir) {
+  const out = { root: {}, env: {} };
+  const candidates = ['fastmd.config.yml', 'fastmd.config.yaml'];
+  let raw = '';
+  for (const f of candidates) {
+    try {
+      raw = fs.readFileSync(path.join(rootDir, f), 'utf8');
+      break;
+    } catch {}
+  }
+  if (!raw) return out;
+  const parsed = parseYamlSimple(raw);
+  const env = parsed.env && typeof parsed.env === 'object' ? parsed.env : {};
+  const root = { ...parsed };
+  root.env = undefined;
+  out.root = root;
+  out.env = env;
+  return out;
+}
+
+/**
+ * Pick known config keys only.
+ * @param {any} src
+ */
+function pickKnownConfig(src) {
+  const o = src || {};
+  /** @type {any} */
+  const out = {};
+  if ('enabled' in o) out.enabled = o.enabled;
+  if ('cacheDir' in o) out.cacheDir = o.cacheDir;
+  if ('persist' in o) out.persist = o.persist;
+  if ('log' in o) out.log = o.log;
+  if ('features' in o) out.features = o.features;
+  return out;
+}
+
+/**
+ * Shallow merge for config with special handling for `features` (deep merge one level).
+ * Later properties override earlier ones.
+ */
+function mergeConfig(a, b) {
+  /** @type {any} */
+  const out = { ...(a || {}) };
+  for (const k of Object.keys(b || {})) {
+    if (k === 'features') {
+      out.features = { ...(a?.features || {}), ...(b?.features || {}) };
+    } else {
+      out[k] = b[k];
+    }
+  }
+  return out;
+}
+
+/**
+ * Apply environment variable overrides to a partially merged config.
+ * @param {any} base
+ * @param {NodeJS.ProcessEnv} env
+ */
+function applyEnvOverrides(base, env) {
+  /** @type {any} */
+  const out = { ...(base || {}) };
+  if (env.FASTMD_DISABLE != null) out.enabled = !truthy(env.FASTMD_DISABLE);
+  if (env.FASTMD_LOG) out.log = env.FASTMD_LOG;
+  if (env.FASTMD_CACHE_DIR) out.cacheDir = env.FASTMD_CACHE_DIR;
+  if (env.FASTMD_PERSIST != null) out.persist = truthy(env.FASTMD_PERSIST);
+  return out;
+}
+
+/**
+ * Very small YAML parser supporting root mapping and two nested levels.
+ * Handles lines: `key: value` and nested blocks ending with `:` using 2-space indents.
+ * Scalars parsed via parseScalar().
+ * @param {string} text
+ */
+function parseYamlSimple(text) {
+  const root = {};
+  /** @type {{obj:any, indent:number}[]} */
+  const stack = [{ obj: root, indent: -1 }];
+  const lines = normalizeNewlines(stripBOM(text)).split('\n');
+  for (const raw of lines) {
+    if (!raw.trim() || raw.trim().startsWith('#') || raw.trim() === '---') continue;
+    const indent = raw.match(/^\s*/)[0].length;
+    const line = raw.trimEnd();
+    while (stack.length && indent <= stack[stack.length - 1].indent) stack.pop();
+    const parent = stack[stack.length - 1].obj;
+    const m = line.match(/^([^:#]+):\s*(.*)$/);
+    if (!m) continue;
+    const key = m[1].trim();
+    const rest = m[2];
+    if (rest === '') {
+      // nested map
+      const obj = {};
+      parent[key] = obj;
+      stack.push({ obj, indent });
+    } else {
+      parent[key] = parseScalar(rest.trim());
+    }
+  }
+  return root;
+}
+
 // Expose internals for white-box tests (non-breaking for consumers)
 export const __internals = {
   createState,
+  loadYamlConfigSync,
+  pickKnownConfig,
+  mergeConfig,
+  applyEnvOverrides,
+  parseYamlSimple,
   shouldProcess,
   normalizeId,
   stripBOM,
@@ -471,3 +592,71 @@ export const __internals = {
   logSummary,
   resolveConfigDigestSync
 };
+
+/**
+ * Remove all cached data and metadata under the given cacheDir.
+ * Does nothing if the directory does not exist.
+ * @param {string} cacheDir base cache directory (e.g., .cache/fastmd)
+ */
+export async function clearCache(cacheDir) {
+  const base = path.resolve(process.cwd(), cacheDir || '.cache/fastmd');
+  const { dataDir, metaDir } = cachePaths(base, 'x');
+  await Promise.all([safeRm(dataDir), safeRm(metaDir)]);
+}
+
+async function safeRm(dir) {
+  try {
+    await fsp.rm(dir, { recursive: true, force: true });
+  } catch {}
+}
+
+/**
+ * Pre-populate cache entries given pairs of (id, code)->js.
+ * This mirrors the key derivation used by the pre phase.
+ * @param {{id:string; code:string; js:string; map?:string}[]} entries
+ * @param {{cacheDir?:string; features?:Record<string, unknown>}} [opts]
+ */
+export async function warmup(entries, opts = {}) {
+  if (!Array.isArray(entries) || !entries.length) return;
+  const root = process.cwd();
+  const base = path.resolve(root, opts.cacheDir || '.cache/fastmd');
+  const features = opts.features || {};
+
+  // Compute digests common to all
+  const featuresDigest = digestJSON(sortedObject(features));
+  const toolchainDigest = await getToolchainDigest();
+  const st = { root, configDigest: '' };
+  resolveConfigDigestSync(st);
+  const configDigest = st.configDigest || '';
+
+  await ensureDirs(base);
+  for (const e of entries) {
+    const norm = normalizeId(e.id, root);
+    const contentLF = normalizeNewlines(stripBOM(e.code));
+    const fm = extractFrontmatter(contentLF);
+    const frontmatterNorm = normalizeFrontmatter(fm);
+    const key = sha256(
+      contentLF +
+        frontmatterNorm +
+        featuresDigest +
+        toolchainDigest +
+        norm.pathDigest +
+        configDigest
+    );
+
+    const { dataPath, mapPath, metaPath } = cachePaths(base, key);
+    try {
+      await atomicWriteIfAbsent(dataPath, e.js);
+      if (e.map) await atomicWriteIfAbsent(mapPath, e.map);
+      const meta = {
+        version: '1',
+        createdAt: new Date().toISOString(),
+        toolchainDigest,
+        featuresDigest,
+        sizeBytes: Buffer.byteLength(e.js, 'utf8'),
+        durationMs: 0
+      };
+      await atomicWriteIfAbsent(metaPath, JSON.stringify(meta));
+    } catch {}
+  }
+}
