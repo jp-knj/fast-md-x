@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
  * - post: completes pending writes after the toolchain generates output
  *
  * @param {object} [userOptions] Optional configuration overrides.
- * @returns {[import('vite').Plugin, import('vite').Plugin]} Vite plugins.
+ * @returns {[{name:string,enforce?:'pre'|'post',transform?:Function},{name:string,enforce?:'pre'|'post',transform?:Function}]}
  */
 export default function fastmdCache(userOptions = {}) {
   const state = createState(userOptions);
@@ -43,23 +43,19 @@ export default function fastmdCache(userOptions = {}) {
           (state.configDigest || '')
       );
 
-      const { dataPath, mapPath } = cachePaths(state.cacheDir, key);
-      try {
-        const data = await fsp.readFile(dataPath, 'utf8');
-        let map = undefined;
-        try {
-          map = await fsp.readFile(mapPath, 'utf8');
-        } catch {}
+      // Try store
+      const store = getStore(state);
+      const got = await store.get(key);
+      if (got) {
         state.stats.hits++;
         const dt = now() - s0;
         if (state.logLevel === 'verbose') logLine(`HIT  ${fmtMs(dt)}  ${norm.rel}`);
-        return map ? { code: data, map } : data;
-      } catch {
-        // MISS: record intent to store after pipeline finishes in post phase
-        state.pending.set(norm.rel, { key, startedAt: s0, rel: norm.rel });
-        if (state.logLevel === 'verbose') logLine(`MISS(new)  --  ${norm.rel}`);
-        return null;
+        return got.map ? { code: got.code, map: got.map } : got.code;
       }
+      // MISS: record intent to store after pipeline finishes in post phase
+      state.pending.set(norm.rel, { key, startedAt: s0, rel: norm.rel });
+      if (state.logLevel === 'verbose') logLine(`MISS(new)  --  ${norm.rel}`);
+      return null;
     },
     buildStart() {
       state.stats = { hits: 0, misses: 0, durations: [] };
@@ -88,26 +84,19 @@ export default function fastmdCache(userOptions = {}) {
       } catch {}
 
       const key = pending.key;
-      const { dataPath, mapPath, metaPath } = cachePaths(state.cacheDir, key);
-      await ensureDirs(state.cacheDir);
-      // write data/map atomically; first wins
+      // write via store (first wins semantics where applicable)
       const start = pending.startedAt || now();
       const duration = now() - start;
-      try {
-        await atomicWriteIfAbsent(dataPath, code);
-        if (map) await atomicWriteIfAbsent(mapPath, map);
-        const meta = {
-          version: '1',
-          createdAt: new Date().toISOString(),
-          toolchainDigest: await getToolchainDigest(),
-          featuresDigest: digestJSON(sortedObject(state.features)),
-          sizeBytes: Buffer.byteLength(code, 'utf8'),
-          durationMs: duration
-        };
-        await atomicWriteIfAbsent(metaPath, JSON.stringify(meta));
-      } catch (e) {
-        // ignore write races or errors; always passthrough
-      }
+      const meta = {
+        version: '1',
+        createdAt: new Date().toISOString(),
+        toolchainDigest: await getToolchainDigest(),
+        featuresDigest: digestJSON(sortedObject(state.features)),
+        sizeBytes: Buffer.byteLength(code, 'utf8'),
+        durationMs: duration
+      };
+      const store = getStore(state);
+      await store.put(key, code, map, meta);
       state.pending.delete(norm.rel);
       state.stats.misses++;
       state.stats.durations.push(duration);
@@ -293,55 +282,7 @@ function sha256(s) {
  * @param {string} cacheDir
  * @param {string} key
  */
-function cachePaths(cacheDir, key) {
-  const dataDir = path.join(cacheDir, 'data');
-  const metaDir = path.join(cacheDir, 'meta');
-  return {
-    dataDir,
-    metaDir,
-    dataPath: path.join(dataDir, `${key}.js`),
-    mapPath: path.join(dataDir, `${key}.js.map`),
-    metaPath: path.join(metaDir, `${key}.json`)
-  };
-}
-
-/**
- * Ensure the cache directories exist.
- * @param {string} cacheDir
- */
-async function ensureDirs(cacheDir) {
-  const { dataDir, metaDir } = cachePaths(cacheDir, 'x');
-  await fsp.mkdir(dataDir, { recursive: true });
-  await fsp.mkdir(metaDir, { recursive: true });
-}
-
-/**
- * Atomically write to dest if and only if it does not already exist.
- * @param {string} dest
- * @param {string} content
- */
-async function atomicWriteIfAbsent(dest, content) {
-  try {
-    await fsp.access(dest, fs.constants.F_OK);
-    return; // already exists
-  } catch {}
-  const dir = path.dirname(dest);
-  const tmp = path.join(dir, `.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`);
-  await fsp.writeFile(tmp, content);
-  try {
-    await fsp.rename(tmp, dest);
-  } catch (e) {
-    // if destination now exists, ignore; otherwise rethrow
-    try {
-      await fsp.access(dest, fs.constants.F_OK);
-    } catch {
-      throw e;
-    }
-  } finally {
-    // cleanup tmp if still there
-    fsp.unlink(tmp).catch(() => {});
-  }
-}
+// FS helper functions removed: using cacache or simple fs APIs inline
 
 /**
  * Build a digest string from versions of Node and relevant packages.
@@ -570,6 +511,8 @@ export const __internals = {
   mergeConfig,
   applyEnvOverrides,
   parseYamlSimple,
+  getStore,
+  CacacheStore,
   shouldProcess,
   normalizeId,
   stripBOM,
@@ -580,9 +523,6 @@ export const __internals = {
   sortedObject,
   digestJSON,
   sha256,
-  cachePaths,
-  ensureDirs,
-  atomicWriteIfAbsent,
   getToolchainDigest,
   safePkgVersion,
   truthy,
@@ -600,14 +540,13 @@ export const __internals = {
  */
 export async function clearCache(cacheDir) {
   const base = path.resolve(process.cwd(), cacheDir || '.cache/fastmd');
-  const { dataDir, metaDir } = cachePaths(base, 'x');
-  await Promise.all([safeRm(dataDir), safeRm(metaDir)]);
-}
-
-async function safeRm(dir) {
+  const dir = path.join(base, 'cacache');
   try {
-    await fsp.rm(dir, { recursive: true, force: true });
+    const cacache = require('cacache');
+    await cacache.rm.all(dir);
   } catch {}
+  // best-effort remove directory
+  await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
 }
 
 /**
@@ -629,7 +568,6 @@ export async function warmup(entries, opts = {}) {
   resolveConfigDigestSync(st);
   const configDigest = st.configDigest || '';
 
-  await ensureDirs(base);
   for (const e of entries) {
     const norm = normalizeId(e.id, root);
     const contentLF = normalizeNewlines(stripBOM(e.code));
@@ -644,19 +582,76 @@ export async function warmup(entries, opts = {}) {
         configDigest
     );
 
-    const { dataPath, mapPath, metaPath } = cachePaths(base, key);
-    try {
-      await atomicWriteIfAbsent(dataPath, e.js);
-      if (e.map) await atomicWriteIfAbsent(mapPath, e.map);
-      const meta = {
-        version: '1',
-        createdAt: new Date().toISOString(),
-        toolchainDigest,
-        featuresDigest,
-        sizeBytes: Buffer.byteLength(e.js, 'utf8'),
-        durationMs: 0
-      };
-      await atomicWriteIfAbsent(metaPath, JSON.stringify(meta));
-    } catch {}
+    const meta = {
+      version: '1',
+      createdAt: new Date().toISOString(),
+      toolchainDigest,
+      featuresDigest,
+      sizeBytes: Buffer.byteLength(e.js, 'utf8'),
+      durationMs: 0
+    };
+    const store = CacacheStore(base);
+    await store.put(key, e.js, e.map, meta);
   }
+}
+
+/**
+ * Select cache store implementation based on state.store.
+ */
+function getStore(state) {
+  const base = state.cacheDir;
+  return CacacheStore(base);
+}
+
+/**
+ * Filesystem store: stores code/map/meta under data/ and meta/.
+ */
+// FSStore removed: cacache is now the single backend
+
+/**
+ * cacache-backed store; falls back to JSON files under <base>/cacache when module is missing.
+ */
+function CacacheStore(baseDir) {
+  let cacache;
+  try {
+    // optional dependency
+    // eslint-disable-next-line n/no-extraneous-require
+    cacache = require('cacache');
+  } catch {}
+  const dir = path.join(baseDir, 'cacache');
+  return {
+    async get(key) {
+      try {
+        if (cacache) {
+          const res = await cacache.get(dir, key);
+          const obj = JSON.parse(res.data.toString('utf8'));
+          return { code: obj.code, map: obj.map };
+        }
+      } catch {}
+      // fallback JSON file
+      try {
+        const fp = path.join(dir, `${key}.json`);
+        const raw = await fsp.readFile(fp, 'utf8');
+        const obj = JSON.parse(raw);
+        return { code: obj.code, map: obj.map };
+      } catch {
+        return null;
+      }
+    },
+    async put(key, code, map, meta) {
+      await fsp.mkdir(dir, { recursive: true });
+      const payload = JSON.stringify({ code, map, meta });
+      try {
+        if (cacache) {
+          await cacache.put(dir, key, Buffer.from(payload));
+          return;
+        }
+      } catch {}
+      // fallback JSON file, first-wins
+      const fp = path.join(dir, `${key}.json`);
+      try {
+        await fsp.writeFile(fp, payload, { flag: 'wx' });
+      } catch {}
+    }
+  };
 }

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://unpkg.com/knip@5.63.1/schema.json",
+  "entry": ["plugins/fastmd-cache/index.mjs"],
+  "project": ["plugins/**/*.mjs", "tests/**/*.ts"],
+  "ignore": ["dist/**", ".cache/**", ".astro/**", "public/**", "node_modules/**"]
+}

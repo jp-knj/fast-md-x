@@ -13,6 +13,9 @@ import path from 'node:path';
 import fastmdCache, { clearCache } from '../plugins/fastmd-cache/index.mjs';
 import { type TransformLike, callTransform } from './_utils';
 
+/**
+ * Create a temporary working directory for tests.
+ */
 async function mkTmp() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'fastmd-clear-'));
 }
@@ -30,18 +33,17 @@ describe('ops: clearCache (TDD)', () => {
     expect(await callTransform(pre as { transform?: TransformLike }, '# a', id)).toBeNull();
     await callTransform(post as { transform?: TransformLike }, 'export default 1', id);
 
-    // Precondition: data exists
-    const dataPath = path.join(cacheDir, 'data');
-    const metaPath = path.join(cacheDir, 'meta');
-    const before = await fs.readdir(dataPath).catch(() => []);
-    expect(before.length > 0).toBe(true);
+    // Precondition: HIT occurs for same inputs
+    const [pre2] = fastmdCache({ cacheDir, log: 'silent' });
+    const hitBefore = await callTransform(pre2 as { transform?: TransformLike }, '# a', id);
+    expect(hitBefore).toBe('export default 1');
 
     // Act: clearCache(cacheDir)
     await clearCache(cacheDir);
 
-    const afterData = await fs.readdir(dataPath).catch(() => []);
-    const afterMeta = await fs.readdir(metaPath).catch(() => []);
-    expect(afterData.length).toBe(0);
-    expect(afterMeta.length).toBe(0);
+    // Postcondition: next pre-transform is MISS (null)
+    const [pre3] = fastmdCache({ cacheDir, log: 'silent' });
+    const missAfter = await callTransform(pre3 as { transform?: TransformLike }, '# a', id);
+    expect(missAfter).toBeNull();
   });
 });

@@ -67,24 +67,7 @@ describe('helpers: hashing + sorting', () => {
   });
 });
 
-describe('helpers: fs + io', () => {
-  test('cachePaths layout', () => {
-    const p = __internals.cachePaths('.cache/x', 'k');
-    expect(p.dataPath.endsWith('data/k.js')).toBe(true);
-    expect(p.mapPath.endsWith('data/k.js.map')).toBe(true);
-    expect(p.metaPath.endsWith('meta/k.json')).toBe(true);
-  });
-
-  test('ensureDirs and atomicWriteIfAbsent', async () => {
-    const dir = await tmpdir('io');
-    await __internals.ensureDirs(dir);
-    const { dataPath } = __internals.cachePaths(dir, 'k');
-    await __internals.atomicWriteIfAbsent(dataPath, 'one');
-    await __internals.atomicWriteIfAbsent(dataPath, 'two');
-    const read = await fs.readFile(dataPath, 'utf8');
-    expect(read).toBe('one');
-  });
-});
+// FS-specific helpers removed (cacache-only backend now)
 
 describe('helpers: toolchain + config', () => {
   test('getToolchainDigest contains node and astro', async () => {

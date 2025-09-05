@@ -13,6 +13,9 @@ import path from 'node:path';
 import fastmdCache, { warmup } from '../plugins/fastmd-cache/index.mjs';
 import { type TransformLike, callTransform } from './_utils';
 
+/**
+ * Create a temporary working directory for tests.
+ */
 async function mkTmp() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'fastmd-warm-'));
 }

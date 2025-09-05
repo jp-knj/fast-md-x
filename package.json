@@ -10,15 +10,18 @@
     "preview": "astro preview",
     "check": "biome check .",
     "test": "bun test",
-    "test:coverage": "bun test --coverage"
+    "test:coverage": "bun test --coverage",
+    "knip": "knip"
   },
   "dependencies": {
-    "astro": "5.13.5"
+    "astro": "5.13.5",
+    "cacache": "20.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/bun": "1.2.21",
-    "bun-types": "1.2.21"
+    "bun-types": "1.2.21",
+    "knip": "5.63.1"
   },
   "packageManager": "pnpm@10.13.1"
 }

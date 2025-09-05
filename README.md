@@ -54,3 +54,10 @@ This repo uses Bun’s built-in test runner.
 Notes:
 - Type support for `bun:test` is provided by `bun-types` and a local `tests/env.d.ts` reference.
 - The fastmd cache plugin is validated by smoke tests under `tests/`.
+
+## 🗄️ Cache Backend
+
+- This project uses cacache for all cache I/O. The previous FS layout (`.cache/fastmd/data`, `meta`) has been removed.
+- Cache location: `.cache/fastmd/cacache`.
+- Clear cache: `rm -rf .cache/fastmd/cacache` (or use the exported helper `clearCache('.cache/fastmd')`).
+- The `store` option/ENV (`FASTMD_STORE`) and YAML key are no longer supported; cacache is always used.
