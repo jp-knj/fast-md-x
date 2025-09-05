@@ -20,16 +20,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout your repository using git
-        uses: actions/checkout@v2
-      - name: Install, build, and upload your site output
-        uses: withastro/action@v0
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-          package-manager: pnpm
+          cache: pnpm
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Install dependencies (pnpm)
+        run: pnpm install --frozen-lockfile
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Run tests (bun test)
+        run: bun test
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Install dependencies (pnpm)
+        run: pnpm install --frozen-lockfile
+      - name: Restore fastmd cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/fastmd
+          key: ${{ runner.os }}-fastmd-${{ hashFiles('pnpm-lock.yaml', 'fastmd.config.yml', 'fastmd.config.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-fastmd-
+      - name: Build site (pnpm)
+        run: pnpm build
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
 
   deploy:
     needs: build

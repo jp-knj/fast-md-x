@@ -42,4 +42,15 @@ All commands are run from the root of the project, from a terminal:
 
 Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
 
- 
+## 🧪 Testing
+
+This repo uses Bun’s built-in test runner.
+
+- Install deps: `pnpm install`
+- Run tests: `pnpm test` (alias for `bun test`)
+- Watch mode: `bun test --watch`
+- Coverage (if configured): `bun test --coverage`
+
+Notes:
+- Type support for `bun:test` is provided by `bun-types` and a local `tests/env.d.ts` reference.
+- The fastmd cache plugin is validated by smoke tests under `tests/`.

@@ -6,6 +6,15 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 
+/**
+ * Create the fastmd-cache Vite plugin in two phases (pre/post).
+ *
+ * - pre: attempts cache read and records pending writes on MISS
+ * - post: completes pending writes after the toolchain generates output
+ *
+ * @param {object} [userOptions] Optional configuration overrides.
+ * @returns {[import('vite').Plugin, import('vite').Plugin]} Vite plugins.
+ */
 export default function fastmdCache(userOptions = {}) {
   const state = createState(userOptions);
   const pre = {
@@ -116,6 +125,12 @@ export default function fastmdCache(userOptions = {}) {
   return [pre, post];
 }
 
+/**
+ * Build internal, resolved state for a plugin instance.
+ * Honors environment variables first, then user options.
+ * @param {object} userOptions
+ * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, features:object, stats:{hits:number,misses:number,durations:number[]}, pending:Map<string, any>, configDigest:string}}
+ */
 function createState(userOptions) {
   const env = process.env;
   const enabled = env.FASTMD_DISABLE ? !truthy(env.FASTMD_DISABLE) : (userOptions.enabled ?? true);
@@ -137,6 +152,11 @@ function createState(userOptions) {
   };
 }
 
+/**
+ * Returns true if the given id should be handled by the cache (md/mdx only).
+ * @param {string} id Module id (may include query).
+ * @param {any} state Plugin state (unused here).
+ */
 function shouldProcess(id, state) {
   const [fp] = id.split('?', 2);
   if (!fp) return false;
@@ -144,28 +164,56 @@ function shouldProcess(id, state) {
   return !!ext;
 }
 
+/**
+ * Normalize an id to an absolute file path and a stable relative path digest.
+ * - Drops queries
+ * - Converts Vite /@fs/ URLs to absolute paths
+ * - Produces POSIX lowercased relative path for keying
+ * @param {string} id
+ * @param {string} root
+ * @returns {{rel:string, pathDigest:string}}
+ */
 function normalizeId(id, root) {
   let [fp] = id.split('?', 2);
-  // Vite can give URLs like /@fs/abs-path
-  fp = fp.replace(/^\/@@?fs\//, '/');
+  // Vite can give URLs like /@fs/abs-path or /@fs//abs-path (double slash)
+  fp = fp.replace(/^\/@@?fs\/+/, '/');
   if (!path.isAbsolute(fp)) fp = path.resolve(root, fp);
   const rel = path.posix.normalize(path.relative(root, fp).split(path.sep).join('/')).toLowerCase();
   return { rel, pathDigest: rel };
 }
 
+/**
+ * Remove a leading UTF-8 BOM if present.
+ * @param {string} s
+ */
 function stripBOM(s) {
   return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
 }
 
+/**
+ * Convert CRLF/CR to LF for stable hashing.
+ * @param {string} s
+ */
 function normalizeNewlines(s) {
   return s.replace(/\r\n?/g, '\n');
 }
 
+/**
+ * Extract YAML frontmatter block from Markdown content (if present).
+ * @param {string} s
+ * @returns {string} YAML text or empty string
+ */
 function extractFrontmatter(s) {
   const m = s.match(/^---\s*\n([\s\S]*?)\n---\s*(\n|$)/);
   return m ? m[1] : '';
 }
 
+/**
+ * Normalize top-level YAML key: value lines into a sorted JSON string.
+ * Minimal parser that supports scalars only.
+ * @param {string} yamlText
+ * @returns {string}
+ */
 function normalizeFrontmatter(yamlText) {
   if (!yamlText) return '';
   // minimal YAML object parser: key: value at top-level only
@@ -183,6 +231,11 @@ function normalizeFrontmatter(yamlText) {
   return JSON.stringify(sortedObject(obj));
 }
 
+/**
+ * Parse a YAML-like scalar value into JS types.
+ * @param {string} v
+ * @returns {string|number|boolean|null}
+ */
 function parseScalar(v) {
   const low = v.toLowerCase();
   if (['true', 'false'].includes(low)) return low === 'true';
@@ -195,20 +248,41 @@ function parseScalar(v) {
   return v;
 }
 
+/**
+ * Return a shallow key-sorted copy of an object.
+ * @template T extends Record<string, any>
+ * @param {T} obj
+ * @returns {T}
+ */
 function sortedObject(obj) {
   const out = {};
   for (const k of Object.keys(obj).sort()) out[k] = obj[k];
   return out;
 }
 
+/**
+ * Deterministically hash an object or string using sha256 of JSON.
+ * @param {any} obj
+ * @returns {string}
+ */
 function digestJSON(obj) {
   return sha256(typeof obj === 'string' ? obj : JSON.stringify(obj));
 }
 
+/**
+ * Compute sha256 hex digest of a string.
+ * @param {string} s
+ * @returns {string}
+ */
 function sha256(s) {
   return crypto.createHash('sha256').update(s).digest('hex');
 }
 
+/**
+ * Return paths used to store data/map/meta for a given key.
+ * @param {string} cacheDir
+ * @param {string} key
+ */
 function cachePaths(cacheDir, key) {
   const dataDir = path.join(cacheDir, 'data');
   const metaDir = path.join(cacheDir, 'meta');
@@ -221,12 +295,21 @@ function cachePaths(cacheDir, key) {
   };
 }
 
+/**
+ * Ensure the cache directories exist.
+ * @param {string} cacheDir
+ */
 async function ensureDirs(cacheDir) {
   const { dataDir, metaDir } = cachePaths(cacheDir, 'x');
   await fsp.mkdir(dataDir, { recursive: true });
   await fsp.mkdir(metaDir, { recursive: true });
 }
 
+/**
+ * Atomically write to dest if and only if it does not already exist.
+ * @param {string} dest
+ * @param {string} content
+ */
 async function atomicWriteIfAbsent(dest, content) {
   try {
     await fsp.access(dest, fs.constants.F_OK);
@@ -250,6 +333,10 @@ async function atomicWriteIfAbsent(dest, content) {
   }
 }
 
+/**
+ * Build a digest string from versions of Node and relevant packages.
+ * @returns {Promise<string>}
+ */
 async function getToolchainDigest() {
   const parts = [];
   parts.push(`node=${process.versions.node}`);
@@ -260,32 +347,73 @@ async function getToolchainDigest() {
   return parts.join('|');
 }
 
+/**
+ * Safely read a package's version from its package.json using require.
+ * @param {string} name
+ * @returns {string|undefined}
+ */
 function safePkgVersion(name) {
   try {
     const pkg = require(`${name}/package.json`);
     return pkg?.version ?? '0';
   } catch {
+    // Fallback: resolve the entry and walk up to nearest package.json
+    try {
+      const entry = require.resolve(name);
+      let dir = path.dirname(entry);
+      const root = path.parse(dir).root;
+      while (dir && dir !== root) {
+        const pj = path.join(dir, 'package.json');
+        try {
+          const raw = fs.readFileSync(pj, 'utf8');
+          const parsed = JSON.parse(raw);
+          if (parsed?.version) return parsed.version;
+        } catch {}
+        dir = path.dirname(dir);
+      }
+    } catch {}
     return undefined;
   }
 }
 
+/**
+ * Evaluate a variety of truthy string forms.
+ * @param {any} v
+ * @returns {boolean}
+ */
 function truthy(v) {
   return /^(1|true|on|yes)$/i.test(String(v));
 }
 
+/**
+ * Millisecond timestamp wrapper for testability.
+ * @returns {number}
+ */
 function now() {
   return Date.now();
 }
 
+/**
+ * Format milliseconds as e.g. "15ms".
+ * @param {number} n
+ * @returns {string}
+ */
 function fmtMs(n) {
   return `${n}ms`;
 }
 
+/**
+ * Emit a standardized log line with a prefix.
+ * @param {string} s
+ */
 function logLine(s) {
-  // eslint-disable-next-line no-console
   console.log(`[fastmd] ${s}`);
 }
 
+/**
+ * Log a summary line of cache statistics.
+ * @param {{stats:{hits:number,misses:number,durations:number[]}}} state
+ */
 function logSummary(state) {
   const total = state.stats.hits + state.stats.misses;
   const hitRate = total ? Math.round((state.stats.hits / total) * 100) : 0;
@@ -299,6 +427,11 @@ function logSummary(state) {
   );
 }
 
+/**
+ * Compute a digest of the YAML config if present in the root.
+ * Side-effect: sets `state.configDigest`.
+ * @param {{root:string, configDigest:string}} state
+ */
 function resolveConfigDigestSync(state) {
   const root = state.root || process.cwd();
   const candidates = ['fastmd.config.yml', 'fastmd.config.yaml'];
@@ -312,3 +445,29 @@ function resolveConfigDigestSync(state) {
   }
   state.configDigest = '';
 }
+
+// Expose internals for white-box tests (non-breaking for consumers)
+export const __internals = {
+  createState,
+  shouldProcess,
+  normalizeId,
+  stripBOM,
+  normalizeNewlines,
+  extractFrontmatter,
+  normalizeFrontmatter,
+  parseScalar,
+  sortedObject,
+  digestJSON,
+  sha256,
+  cachePaths,
+  ensureDirs,
+  atomicWriteIfAbsent,
+  getToolchainDigest,
+  safePkgVersion,
+  truthy,
+  now,
+  fmtMs,
+  logLine,
+  logSummary,
+  resolveConfigDigestSync
+};
