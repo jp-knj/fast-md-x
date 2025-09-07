@@ -2,6 +2,11 @@
 
 - What does this PR change? Keep it focused on a single concern.
 
+## Spec/Plan Links
+- Spec: specs/<ID>-<slug>/spec.md
+- Plan: specs/<ID>-<slug>/plan.md
+- Tasks: specs/<ID>-<slug>/tasks.md
+
 ## TDD Checklist (New Functions Only)
 
 - [ ] Added a failing test first (commit ref: __________)
@@ -26,4 +31,3 @@
 
 - Breaking changes? Migration steps?
 - Rollback plan if issues arise
-
