@@ -89,6 +89,17 @@ fastmd-cache honors environment variables first, then plugin options (ENV > opti
     - 例: `{"evt":"cache_hit","ts":"2025-09-07T12:34:56.789Z","rel":"docs/x.md","durationMs":3}`
     - 例: `{"evt":"summary","total":120,"hits":96,"misses":24,"hitRate":80,"p50":5,"p95":28,"savedMs":2400}`
 
+### NDJSON schema v1（安定契約）
+各行は1つの JSON オブジェクト。フィールドは後方互換（追加のみ）。
+
+共通: `ts`(ISO-8601), `evt`(string)
+- cache_hit: `{ evt, ts, rel, durationMs, sizeBytes?, toolchainDigest? }`
+- cache_miss: `{ evt, ts, rel }`
+- cache_write: `{ evt, ts, rel, durationMs, sizeBytes }`
+- summary: `{ evt, ts?, total, hits, misses, hitRate, p50, p95, savedMs }`
+
+備考: savedMs は HIT 時に過去 MISS の durationMs を合算した推定値。
+
 - FASTMD_SALT: app-specific salt in key derivation
   - Purpose: isolate cache domains across similar repos or CI contexts
   - Default: empty

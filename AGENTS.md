@@ -24,3 +24,11 @@
 - 依存追加は理由・影響・代替案を伴う提案から
 - ドキュメント更新（README/CHANGELOG）は PR に含める
 
+## Dev/HMR 方針（Phase 3）
+- 既定: observe-only（開発サーバではコードを変更せず、HIT/MISS を計測するのみ）
+- 目的: 安全に挙動を観測し、将来の read-through 最適化（Phase 4）に備える
+- ルール:
+  - 本番と同じキー設計（mode/importer/salt 含む）で HIT/MISS を計測
+  - ログレベルは `FASTMD_LOG=summary` あるいは `json`（NDJSON）
+  - 変換結果の差異を生まず、ビルドの正当性に影響しないこと
+  - read-through（HMR 時のキャッシュ読み出し/書き込み）は Phase 4 で検討（安全策と回避策を含む）
