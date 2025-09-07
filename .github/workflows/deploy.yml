@@ -32,8 +32,10 @@ jobs:
           cache: pnpm
       - name: Install pnpm
         run: npm install -g pnpm@10.13.1
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
       - name: Lint (Biome)
@@ -60,8 +62,10 @@ jobs:
           cache: pnpm
       - name: Install pnpm
         run: npm install -g pnpm@10.13.1
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
       - name: Restore fastmd cache
@@ -71,8 +75,16 @@ jobs:
           key: ${{ runner.os }}-fastmd-${{ hashFiles('pnpm-lock.yaml', 'fastmd.config.yml', 'fastmd.config.yaml') }}
           restore-keys: |
             ${{ runner.os }}-fastmd-
-      - name: Build site (pnpm)
-        run: pnpm build
+      - name: Build site (pnpm) with fastmd NDJSON logs
+        run: |
+          FASTMD_LOG=json pnpm build | tee fastmd.ndjson
+      - name: Summarize fastmd logs
+        run: node scripts/summarize-fastmd.mjs fastmd.ndjson | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload fastmd NDJSON artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastmd-ndjson
+          path: fastmd.ndjson
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
