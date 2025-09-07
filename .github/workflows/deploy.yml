@@ -30,8 +30,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
       - name: Lint (Biome)
@@ -56,8 +58,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
       - name: Restore fastmd cache
