@@ -12,7 +12,10 @@
     "test": "bun test",
     "test:coverage": "bun test --coverage",
     "typecheck": "tsc --noEmit",
-    "knip": "knip"
+    "knip": "knip",
+    "setup:hooks": "bash scripts/setup-git-hooks.sh",
+    "precommit:run": "pnpm check && pnpm typecheck",
+    "bench": "node scripts/bench.mjs"
   },
   "dependencies": {
     "astro": "5.13.5",

@@ -33,6 +33,16 @@ export default function fastmdCache(userOptions = {}) {
       state.root = cfg.root || process.cwd();
       // compute toolchain digest once
       state.toolchainDigest = getToolchainDigestSync();
+      // record vite command/mode for key derivation tagging
+      // normalize to our compact tags used in keys: 'dev' | 'build'
+      try {
+        /** @type {any} */
+        const anyCfg = cfg || {};
+        state.viteCommand =
+          anyCfg.command || (process.env.NODE_ENV === 'production' ? 'build' : 'serve');
+        state.viteMode =
+          anyCfg.mode || (process.env.NODE_ENV === 'production' ? 'production' : 'development');
+      } catch {}
     },
     async transform(code, id) {
       if (!shouldProcess(id, state)) return null;
@@ -40,14 +50,25 @@ export default function fastmdCache(userOptions = {}) {
 
       const s0 = now();
       const norm = normalizeId(id, state.root);
-      const contentLF = normalizeNewlines(stripBOM(code));
-      const fmParsed = matter(contentLF);
-      const frontmatterNorm = stringify(fmParsed.data || {});
-      const featuresDigest = digestJSON(sortedObject(state.features));
       const toolchainDigest = state.toolchainDigest || getToolchainDigestSync();
-      const key = sha256(
-        contentLF + frontmatterNorm + featuresDigest + toolchainDigest + norm.pathDigest
-      );
+      // attempt to capture a representative importer (first) for added safety
+      let importer = '';
+      try {
+        const info = this?.getModuleInfo?.(id);
+        const first = info && Array.isArray(info.importers) ? info.importers[0] : '';
+        importer = first || '';
+      } catch {}
+
+      const key = computeKey({
+        code,
+        id,
+        root: state.root,
+        features: state.features,
+        toolchainDigest,
+        mode: state.viteCommand === 'serve' ? 'dev' : 'build',
+        salt: state.salt || '',
+        importer
+      });
 
       // Try cacache
       try {
@@ -55,18 +76,35 @@ export default function fastmdCache(userOptions = {}) {
         const got = JSON.parse(res.data.toString('utf8'));
         state.stats.hits++;
         const dt = now() - s0;
+        // accumulate estimated saved time using prior MISS duration (if present)
+        if (got?.meta?.durationMs != null) {
+          const n = Number(got.meta.durationMs) || 0;
+          state.stats.savedMs = (state.stats.savedMs || 0) + (n > 0 ? n : 0);
+        }
         if (state.logLevel === 'verbose') logLine(`HIT  ${fmtMs(dt)}  ${norm.rel}`);
+        if (state.logLevel === 'json')
+          logJSON('cache_hit', {
+            rel: norm.rel,
+            durationMs: dt,
+            sizeBytes: got?.meta?.sizeBytes,
+            toolchainDigest: got?.meta?.toolchainDigest
+          });
         return got.map ? { code: got.code, map: got.map } : got.code;
       } catch {}
       // MISS: record intent to store after pipeline finishes in post phase
       state.pending.set(norm.rel, { key, startedAt: s0, rel: norm.rel });
       if (state.logLevel === 'verbose') logLine(`MISS(new)  --  ${norm.rel}`);
+      if (state.logLevel === 'json') logJSON('cache_miss', { rel: norm.rel });
       return null;
     },
     buildStart() {
-      state.stats = { hits: 0, misses: 0, durations: [] };
+      state.stats = { hits: 0, misses: 0, durations: [], savedMs: 0 };
     },
     buildEnd() {
+      if (state.logLevel === 'json') {
+        logSummaryJSON(state);
+        return;
+      }
       if (state.logLevel !== 'silent') logSummary(state);
     }
   };
@@ -106,9 +144,15 @@ export default function fastmdCache(userOptions = {}) {
       state.pending.delete(norm.rel);
       state.stats.misses++;
       state.stats.durations.push(duration);
+      if (state.logLevel === 'json')
+        logJSON('cache_write', { rel: norm.rel, durationMs: duration, sizeBytes: meta.sizeBytes });
       return null; // do not alter code; just observe
     },
     buildEnd() {
+      if (state.logLevel === 'json') {
+        logSummaryJSON(state);
+        return;
+      }
       if (state.logLevel !== 'silent') logSummary(state);
     }
   };
@@ -123,7 +167,7 @@ export default function fastmdCache(userOptions = {}) {
  * Build internal, resolved state for a plugin instance.
  * Honors environment variables first, then user options.
  * @param {object} userOptions
- * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, features:object, stats:{hits:number,misses:number,durations:number[]}, pending:Map<string, any>, toolchainDigest:string}}
+ * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, salt:string, features:object, stats:{hits:number,misses:number,durations:number[],savedMs:number}, pending:Map<string, any>, toolchainDigest:string, viteCommand:string, viteMode:string}}
  */
 function createState(userOptions) {
   const env = process.env;
@@ -135,6 +179,7 @@ function createState(userOptions) {
 
   const enabled = withEnv.enabled ?? true;
   const logLevel = withEnv.log ?? 'summary';
+  const salt = withEnv.salt || '';
   let cacheDir = withEnv.cacheDir ? path.resolve(root, withEnv.cacheDir) : undefined;
   if (!cacheDir) {
     try {
@@ -152,11 +197,14 @@ function createState(userOptions) {
     root,
     enabled,
     logLevel,
+    salt,
     cacheDir,
     features,
-    stats: { hits: 0, misses: 0, durations: [] },
+    stats: { hits: 0, misses: 0, durations: [], savedMs: 0 },
     pending: new Map(),
-    toolchainDigest: ''
+    toolchainDigest: '',
+    viteCommand: 'build',
+    viteMode: 'production'
   };
 }
 
@@ -337,7 +385,7 @@ function logLine(s) {
 
 /**
  * Log a summary line of cache statistics.
- * @param {{stats:{hits:number,misses:number,durations:number[]}}} state
+ * @param {{stats:{hits:number,misses:number,durations:number[],savedMs?:number}}} state
  */
 function logSummary(state) {
   const total = state.stats.hits + state.stats.misses;
@@ -348,8 +396,41 @@ function logSummary(state) {
   logLine(
     `summary total=${total} hits=${state.stats.hits} misses=${state.stats.misses} hitRate=${hitRate}% p50=${fmtMs(
       p50
-    )} p95=${fmtMs(p95)}`
+    )} p95=${fmtMs(p95)} savedMs=${fmtMs(state.stats.savedMs || 0)}`
   );
+}
+
+/**
+ * Log a JSON line for an event (NDJSON-friendly).
+ * @param {string} evt
+ * @param {Record<string, any>} fields
+ */
+function logJSON(evt, fields) {
+  try {
+    const row = { evt, ts: new Date().toISOString(), ...fields };
+    console.log(JSON.stringify(row));
+  } catch {}
+}
+
+/**
+ * Log a JSON summary row.
+ * @param {{stats:{hits:number,misses:number,durations:number[],savedMs?:number}}} state
+ */
+function logSummaryJSON(state) {
+  const total = state.stats.hits + state.stats.misses;
+  const hitRate = total ? Math.round((state.stats.hits / total) * 100) : 0;
+  const arr = state.stats.durations.slice().sort((a, b) => a - b);
+  const p50 = arr.length ? arr[Math.floor(arr.length * 0.5)] : 0;
+  const p95 = arr.length ? arr[Math.floor(arr.length * 0.95)] : 0;
+  logJSON('summary', {
+    total,
+    hits: state.stats.hits,
+    misses: state.stats.misses,
+    hitRate,
+    p50,
+    p95,
+    savedMs: state.stats.savedMs || 0
+  });
 }
 
 /**
@@ -380,6 +461,7 @@ function applyEnvOverrides(base, env) {
   if (env.FASTMD_LOG) out.log = env.FASTMD_LOG;
   if (env.FASTMD_CACHE_DIR) out.cacheDir = env.FASTMD_CACHE_DIR;
   if (env.FASTMD_PERSIST != null) out.persist = truthy(env.FASTMD_PERSIST);
+  if (env.FASTMD_SALT) out.salt = env.FASTMD_SALT;
   return out;
 }
 
@@ -397,7 +479,8 @@ export const __internals = {
   getToolchainDigest,
   truthy,
   fmtMs,
-  logSummary
+  logSummary,
+  computeKey
 };
 
 /**
@@ -429,13 +512,17 @@ export async function warmup(entries, opts = {}) {
   const featuresDigest = digestJSON(sortedObject(features));
   const toolchainDigest = getToolchainDigestSync();
   for (const e of entries) {
-    const norm = normalizeId(e.id, root);
-    const contentLF = normalizeNewlines(stripBOM(e.code));
-    const fmParsed = matter(contentLF);
-    const frontmatterNorm = stringify(fmParsed.data || {});
-    const key = sha256(
-      contentLF + frontmatterNorm + featuresDigest + toolchainDigest + norm.pathDigest
-    );
+    // Reuse the same key derivation as runtime (mode=build, no importer, no salt unless provided)
+    const key = computeKey({
+      code: e.code,
+      id: e.id,
+      root,
+      features,
+      toolchainDigest,
+      mode: 'build',
+      salt: '',
+      importer: ''
+    });
 
     const meta = {
       version: '1',
@@ -448,4 +535,34 @@ export async function warmup(entries, opts = {}) {
     const payload = JSON.stringify({ code: e.js, map: e.map, meta });
     await cacache.put(base, key, Buffer.from(payload));
   }
+}
+
+/**
+ * Compute the stable cache key for a given module content and context.
+ * Includes normalized content, frontmatter, features digest, toolchain digest,
+ * normalized relative path digest, and sensitivity to mode/importer/salt.
+ * @param {{code:string; id:string; root:string; features:Record<string, unknown>; toolchainDigest:string; mode:'dev'|'build'|'prod'; salt?:string; importer?:string}} p
+ * @returns {string}
+ */
+function computeKey(p) {
+  const norm = normalizeId(p.id, p.root);
+  const contentLF = normalizeNewlines(stripBOM(p.code));
+  const fmParsed = matter(contentLF);
+  const contentBody = fmParsed.content ?? contentLF; // exclude FM when present
+  const frontmatterNorm = stringify(fmParsed.data || {});
+  const featuresDigest = digestJSON(sortedObject(p.features || {}));
+  const modeTag = p.mode === 'dev' ? 'dev' : 'build';
+  const salt = p.salt || '';
+  // normalize importer path if present for stability
+  let importerDigest = '';
+  if (p.importer) {
+    try {
+      importerDigest = normalizeId(String(p.importer), p.root).pathDigest;
+    } catch {
+      importerDigest = String(p.importer);
+    }
+  }
+  return sha256(
+    `${contentBody}${frontmatterNorm}${featuresDigest}${p.toolchainDigest || ''}${norm.pathDigest}|${modeTag}|${salt}|${importerDigest}`
+  );
 }

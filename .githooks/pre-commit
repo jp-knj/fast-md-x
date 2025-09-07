@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Choose package manager: pnpm > npm > yarn
+pm=""
+if command -v pnpm >/dev/null 2>&1; then pm="pnpm"
+elif command -v npm >/dev/null 2>&1; then pm="npm"
+elif command -v yarn >/dev/null 2>&1; then pm="yarn"
+else
+  echo "[pre-commit] No package manager found (pnpm/npm/yarn)." >&2
+  exit 1
+fi
+
+echo "[pre-commit] Running lint/format checks…"
+if [ "$pm" = "pnpm" ]; then
+  pnpm -s check
+else
+  $pm run -s check
+fi
+
+echo "[pre-commit] Running typecheck…"
+if [ "$pm" = "pnpm" ]; then
+  pnpm -s typecheck
+else
+  $pm run -s typecheck
+fi
+
+echo "[pre-commit] OK"
