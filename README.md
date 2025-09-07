@@ -116,6 +116,7 @@ Notes
   - `pnpm bench` (cold → warm → hit; parses fastmd summary)
 - Seed N generated pages into a temporary copy to see clearer speedups:
   - `pnpm bench -- --pages 100`
-  - Or specify target/cache: `pnpm bench -- examples/minimal .cache/bench-fastmd --pages 200`
+  - Add heavier content per page: `pnpm bench -- --pages 500 --lines 300`
+  - Or specify target/cache: `pnpm bench -- examples/minimal .cache/bench-fastmd --pages 200 --lines 400`
 - One-off generation (writes into the given example directory):
-  - `node scripts/gen-example-pages.mjs examples/minimal 100`
+  - `node scripts/gen-example-pages.mjs examples/minimal 100 docs 300`

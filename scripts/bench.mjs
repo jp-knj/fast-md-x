@@ -52,16 +52,19 @@ async function runAstroBuild(targetDir, env = {}) {
 }
 
 async function main() {
-  // Args: [targetDir] [cacheDir] [--pages N]
+  // Args: [targetDir] [cacheDir] [--pages N] [--lines N]
   let targetDir = 'examples/minimal';
   let cacheDir = '.cache/bench-fastmd';
   let pages = 0;
+  let lines = 0;
   const argv = process.argv.slice(2);
   const positionals = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--pages' && i + 1 < argv.length) {
       pages = Number(argv[++i] || '0') || 0;
+    } else if (a === '--lines' && i + 1 < argv.length) {
+      lines = Number(argv[++i] || '0') || 0;
     } else if (a.startsWith('--')) {
       // ignore unknown flags
     } else {
@@ -73,15 +76,19 @@ async function main() {
 
   const absCache = path.resolve(process.cwd(), cacheDir);
 
-  console.log(`[bench] target=${targetDir} cacheDir=${cacheDir} pages=${pages || 0}`);
+  console.log(
+    `[bench] target=${targetDir} cacheDir=${cacheDir} pages=${pages || 0} lines=${lines || 0}`
+  );
   await rmrf(absCache);
 
   // If pages requested, copy targetDir to a temp dir and seed N pages
   if (pages > 0) {
     const seeded = path.resolve(process.cwd(), `.cache/bench-site-${pages}-${Date.now()}`);
     await fs.cp(targetDir, seeded, { recursive: true });
-    const made = await generatePages(seeded, pages, 'docs');
-    console.log(`[bench] Seeded ${made} pages at ${seeded}/src/pages/docs/`);
+    const made = await generatePages(seeded, pages, 'docs', lines);
+    console.log(
+      `[bench] Seeded ${made} pages at ${seeded}/src/pages/docs/ with ~${lines} lines each`
+    );
     targetDir = seeded;
   }
 
