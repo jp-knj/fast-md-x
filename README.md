@@ -109,3 +109,13 @@ Notes
 1. 雛形作成: `scripts/create-new-feature.sh <ID> <slug>` 例: `scripts/create-new-feature.sh 001 sample`
 2. 編集: `specs/<ID>-<slug>/{spec.md,plan.md,tasks.md}` を埋め、PR に spec/plan のリンクを追記
 3. 実行/検証: `pnpm check && pnpm typecheck && pnpm test` が通ること（CI は既存設定を使用）
+
+## Benchmarking
+
+- Quick benchmark on the minimal example:
+  - `pnpm bench` (cold → warm → hit; parses fastmd summary)
+- Seed N generated pages into a temporary copy to see clearer speedups:
+  - `pnpm bench -- --pages 100`
+  - Or specify target/cache: `pnpm bench -- examples/minimal .cache/bench-fastmd --pages 200`
+- One-off generation (writes into the given example directory):
+  - `node scripts/gen-example-pages.mjs examples/minimal 100`

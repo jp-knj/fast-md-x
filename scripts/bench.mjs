@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { generatePages } from './gen-example-pages.mjs';
 
 function nowMs() {
   return Number(process.hrtime.bigint() / 1000000n);
@@ -51,12 +52,38 @@ async function runAstroBuild(targetDir, env = {}) {
 }
 
 async function main() {
-  const targetDir = process.argv[2] || 'examples/minimal';
-  const cacheDir = process.argv[3] || '.cache/bench-fastmd';
+  // Args: [targetDir] [cacheDir] [--pages N]
+  let targetDir = 'examples/minimal';
+  let cacheDir = '.cache/bench-fastmd';
+  let pages = 0;
+  const argv = process.argv.slice(2);
+  const positionals = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--pages' && i + 1 < argv.length) {
+      pages = Number(argv[++i] || '0') || 0;
+    } else if (a.startsWith('--')) {
+      // ignore unknown flags
+    } else {
+      positionals.push(a);
+    }
+  }
+  if (positionals[0]) targetDir = positionals[0];
+  if (positionals[1]) cacheDir = positionals[1];
+
   const absCache = path.resolve(process.cwd(), cacheDir);
 
-  console.log(`[bench] target=${targetDir} cacheDir=${cacheDir}`);
+  console.log(`[bench] target=${targetDir} cacheDir=${cacheDir} pages=${pages || 0}`);
   await rmrf(absCache);
+
+  // If pages requested, copy targetDir to a temp dir and seed N pages
+  if (pages > 0) {
+    const seeded = path.resolve(process.cwd(), `.cache/bench-site-${pages}-${Date.now()}`);
+    await fs.cp(targetDir, seeded, { recursive: true });
+    const made = await generatePages(seeded, pages, 'docs');
+    console.log(`[bench] Seeded ${made} pages at ${seeded}/src/pages/docs/`);
+    targetDir = seeded;
+  }
 
   const runs = [];
   runs.push(['cold', await runAstroBuild(targetDir, { FASTMD_CACHE_DIR: absCache })]);
