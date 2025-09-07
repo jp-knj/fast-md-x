@@ -52,9 +52,9 @@ Reference behaviors are documented in `fastmd.phase1.spec.yml`.
 
 ## Cache Backend
 - Backend: cacache only. The old FS layout (`data/`, `meta/`) is removed.
-- Location: `.cache/fastmd/cacache`.
-- Clear: `pnpm dlx zx -e "await import('./plugins/fastmd-cache/index.mjs').then(m=>m.clearCache('.cache/fastmd'))"` or simply `rm -rf .cache/fastmd/cacache`.
-- Removed keys: `store` option/ENV/YAML (e.g., `FASTMD_STORE`) are no longer supported; cacache is always used.
+- Default Location: resolved via `find-cache-dir({ name: 'fastmd', create: true })`; falls back to `./.cache/fastmd` if not available. You can override with `FASTMD_CACHE_DIR` or the `cacheDir` option.
+- Clear: `rm -rf .cache/fastmd` or programmatically via `clearCache('.cache/fastmd')`.
+- Removed keys: `store` option/ENV/YAML (e.g., `FASTMD_STORE`) are not supported; cacache is always used.
 
 ## TDD For New Functions
 - Policy: From Sep 5, 2025, use test‑driven development only for newly added functions. Existing functions are exempt unless behavior changes (add regression tests).

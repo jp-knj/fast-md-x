@@ -28,19 +28,31 @@ describe('fastmd-cache: end-to-end PRE/POST flow', () => {
     const [pre, post] = fastmdCache({ cacheDir, log: 'silent' });
 
     // First pass: MISS, then write via POST
-    const miss = await callTransform(pre as { transform?: TransformLike }, contentV1, id);
+    const miss = await callTransform(
+      pre as unknown as { transform?: TransformLike },
+      contentV1,
+      id
+    );
     expect(miss).toBeNull();
-    await callTransform(post as { transform?: TransformLike }, jsV1, id);
+    await callTransform(post as unknown as { transform?: TransformLike }, jsV1, id);
 
     // Second pass with same inputs: HIT returns cached JS
-    const hit = await callTransform(pre as { transform?: TransformLike }, contentV1, id);
+    const hit = await callTransform(pre as unknown as { transform?: TransformLike }, contentV1, id);
     expect(hit).toBe(jsV1);
 
     // Change content -> MISS again
-    const miss2 = await callTransform(pre as { transform?: TransformLike }, contentV2, id);
+    const miss2 = await callTransform(
+      pre as unknown as { transform?: TransformLike },
+      contentV2,
+      id
+    );
     expect(miss2).toBeNull();
-    await callTransform(post as { transform?: TransformLike }, jsV2, id);
-    const hit2 = await callTransform(pre as { transform?: TransformLike }, contentV2, id);
+    await callTransform(post as unknown as { transform?: TransformLike }, jsV2, id);
+    const hit2 = await callTransform(
+      pre as unknown as { transform?: TransformLike },
+      contentV2,
+      id
+    );
     expect(hit2).toBe(jsV2);
   });
 });

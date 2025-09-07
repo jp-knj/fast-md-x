@@ -58,6 +58,6 @@ Notes:
 ## 🗄️ Cache Backend
 
 - This project uses cacache for all cache I/O. The previous FS layout (`.cache/fastmd/data`, `meta`) has been removed.
-- Cache location: `.cache/fastmd/cacache`.
-- Clear cache: `rm -rf .cache/fastmd/cacache` (or use the exported helper `clearCache('.cache/fastmd')`).
+- Default location: resolved with `find-cache-dir({ name: 'fastmd', create: true })`; falls back to `./.cache/fastmd` if unavailable. Override with `FASTMD_CACHE_DIR` or `cacheDir` option.
+- Clear cache: `rm -rf .cache/fastmd` (or use the exported helper `clearCache('.cache/fastmd')`).
 - The `store` option/ENV (`FASTMD_STORE`) and YAML key are no longer supported; cacache is always used.

@@ -1,19 +1,28 @@
 import crypto from 'node:crypto';
-import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import cacache from 'cacache';
 
 const require = createRequire(import.meta.url);
+const matter = require('gray-matter');
+const stringify = require('json-stable-stringify');
 
 /**
- * Create the fastmd-cache Vite plugin in two phases (pre/post).
+ * Create the fastmd-cache plugin (two phases: pre/post).
  *
- * - pre: attempts cache read and records pending writes on MISS
- * - post: completes pending writes after the toolchain generates output
+ * Behavior
+ * - pre: computes a stable key and tries to read from the cacache store; on MISS,
+ *         records intent for post to persist the final output.
+ * - post: after the toolchain produces code (+ optional sourcemap), writes an entry
+ *         to cacache keyed identically to pre.
  *
- * @param {object} [userOptions] Optional configuration overrides.
- * @returns {[{name:string,enforce?:'pre'|'post',transform?:Function},{name:string,enforce?:'pre'|'post',transform?:Function}]}
+ * Notes
+ * - Cache backend is always cacache (no FS fallback).
+ * - Only Markdown/MDX module ids are considered.
+ *
+ * @param {object} [userOptions] Optional overrides (enabled, cacheDir, log, features).
+ * @returns {[{name:string,enforce?:string,transform?:unknown},{name:string,enforce?:string,transform?:unknown}]}
  */
 export default function fastmdCache(userOptions = {}) {
   const state = createState(userOptions);
@@ -22,6 +31,8 @@ export default function fastmdCache(userOptions = {}) {
     enforce: 'pre',
     configResolved(cfg) {
       state.root = cfg.root || process.cwd();
+      // compute toolchain digest once
+      state.toolchainDigest = getToolchainDigestSync();
     },
     async transform(code, id) {
       if (!shouldProcess(id, state)) return null;
@@ -30,28 +41,23 @@ export default function fastmdCache(userOptions = {}) {
       const s0 = now();
       const norm = normalizeId(id, state.root);
       const contentLF = normalizeNewlines(stripBOM(code));
-      const fm = extractFrontmatter(contentLF);
-      const frontmatterNorm = normalizeFrontmatter(fm);
+      const fmParsed = matter(contentLF);
+      const frontmatterNorm = stringify(fmParsed.data || {});
       const featuresDigest = digestJSON(sortedObject(state.features));
-      const toolchainDigest = await getToolchainDigest();
+      const toolchainDigest = state.toolchainDigest || getToolchainDigestSync();
       const key = sha256(
-        contentLF +
-          frontmatterNorm +
-          featuresDigest +
-          toolchainDigest +
-          norm.pathDigest +
-          (state.configDigest || '')
+        contentLF + frontmatterNorm + featuresDigest + toolchainDigest + norm.pathDigest
       );
 
-      // Try store
-      const store = getStore(state);
-      const got = await store.get(key);
-      if (got) {
+      // Try cacache
+      try {
+        const res = await cacache.get(state.cacheDir, key);
+        const got = JSON.parse(res.data.toString('utf8'));
         state.stats.hits++;
         const dt = now() - s0;
         if (state.logLevel === 'verbose') logLine(`HIT  ${fmtMs(dt)}  ${norm.rel}`);
         return got.map ? { code: got.code, map: got.map } : got.code;
-      }
+      } catch {}
       // MISS: record intent to store after pipeline finishes in post phase
       state.pending.set(norm.rel, { key, startedAt: s0, rel: norm.rel });
       if (state.logLevel === 'verbose') logLine(`MISS(new)  --  ${norm.rel}`);
@@ -80,7 +86,7 @@ export default function fastmdCache(userOptions = {}) {
       try {
         // vite uses rollup context here
         const sm = this.getCombinedSourcemap?.();
-        map = Object.keys(sm ?? {}).length ? JSON.stringify(sm) : undefined;
+        map = sm && Object.keys(sm).length ? sm : undefined;
       } catch {}
 
       const key = pending.key;
@@ -90,13 +96,13 @@ export default function fastmdCache(userOptions = {}) {
       const meta = {
         version: '1',
         createdAt: new Date().toISOString(),
-        toolchainDigest: await getToolchainDigest(),
+        toolchainDigest: state.toolchainDigest || getToolchainDigestSync(),
         featuresDigest: digestJSON(sortedObject(state.features)),
         sizeBytes: Buffer.byteLength(code, 'utf8'),
         durationMs: duration
       };
-      const store = getStore(state);
-      await store.put(key, code, map, meta);
+      const payload = JSON.stringify({ code, map, meta });
+      await cacache.put(state.cacheDir, key, Buffer.from(payload));
       state.pending.delete(norm.rel);
       state.stats.misses++;
       state.stats.durations.push(duration);
@@ -107,8 +113,7 @@ export default function fastmdCache(userOptions = {}) {
     }
   };
 
-  // attempt to load YAML for digest synchronously (no deps)
-  resolveConfigDigestSync(state);
+  // no config file loading (env + options only)
 
   // expose both phases
   return [pre, post];
@@ -118,26 +123,30 @@ export default function fastmdCache(userOptions = {}) {
  * Build internal, resolved state for a plugin instance.
  * Honors environment variables first, then user options.
  * @param {object} userOptions
- * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, features:object, stats:{hits:number,misses:number,durations:number[]}, pending:Map<string, any>, configDigest:string}}
+ * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, features:object, stats:{hits:number,misses:number,durations:number[]}, pending:Map<string, any>, toolchainDigest:string}}
  */
 function createState(userOptions) {
   const env = process.env;
   const root = process.cwd();
 
-  // Load YAML config (root + env[NODE_ENV])
-  const yaml = loadYamlConfigSync(root);
-  const nodeEnv = env.NODE_ENV || 'development';
-  const yamlRoot = pickKnownConfig(yaml.root);
-  const yamlEnv = pickKnownConfig(yaml.env[nodeEnv] || {});
-
-  // Compose: YAML root -> YAML env -> options -> ENV (highest)
-  const base = mergeConfig(yamlRoot, yamlEnv);
-  const withOpts = mergeConfig(base, pickKnownConfig(userOptions || {}));
+  // Compose: options -> ENV (ENV highest)
+  const withOpts = pickKnownConfig(userOptions || {});
   const withEnv = applyEnvOverrides(withOpts, env);
 
   const enabled = withEnv.enabled ?? true;
   const logLevel = withEnv.log ?? 'summary';
-  const cacheDir = path.resolve(root, withEnv.cacheDir ?? '.cache/fastmd');
+  let cacheDir = withEnv.cacheDir ? path.resolve(root, withEnv.cacheDir) : undefined;
+  if (!cacheDir) {
+    try {
+      const r = (require('find-cache-dir')?.default || require('find-cache-dir'))({
+        name: 'fastmd',
+        create: true
+      });
+      cacheDir = r || path.resolve(root, '.cache/fastmd');
+    } catch {
+      cacheDir = path.resolve(root, '.cache/fastmd');
+    }
+  }
   const features = withEnv.features ?? {};
   return {
     root,
@@ -147,16 +156,16 @@ function createState(userOptions) {
     features,
     stats: { hits: 0, misses: 0, durations: [] },
     pending: new Map(),
-    configDigest: ''
+    toolchainDigest: ''
   };
 }
 
 /**
  * Returns true if the given id should be handled by the cache (md/mdx only).
  * @param {string} id Module id (may include query).
- * @param {any} state Plugin state (unused here).
+ * @param {any} _state Plugin state (unused).
  */
-function shouldProcess(id, state) {
+function shouldProcess(id, _state) {
   const [fp] = id.split('?', 2);
   if (!fp) return false;
   const ext = fp.toLowerCase().endsWith('.md') || fp.toLowerCase().endsWith('.mdx');
@@ -213,45 +222,12 @@ function extractFrontmatter(s) {
  * @param {string} yamlText
  * @returns {string}
  */
-function normalizeFrontmatter(yamlText) {
-  if (!yamlText) return '';
-  // minimal YAML object parser: key: value at top-level only
-  const obj = {};
-  const lines = yamlText.split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('---')) continue;
-    const idx = trimmed.indexOf(':');
-    if (idx === -1) continue;
-    const k = trimmed.slice(0, idx).trim();
-    const vraw = trimmed.slice(idx + 1).trim();
-    obj[k] = parseScalar(vraw);
-  }
-  return JSON.stringify(sortedObject(obj));
-}
-
-/**
- * Parse a YAML-like scalar value into JS types.
- * @param {string} v
- * @returns {string|number|boolean|null}
- */
-function parseScalar(v) {
-  const low = v.toLowerCase();
-  if (['true', 'false'].includes(low)) return low === 'true';
-  if (['null', 'none', '~'].includes(low)) return null;
-  if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
-  // strip quotes if present
-  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-    return v.slice(1, -1);
-  }
-  return v;
-}
+// normalizeFrontmatter/parseScalar removed (gray-matter handles parsing)
 
 /**
  * Return a shallow key-sorted copy of an object.
- * @template T extends Record<string, any>
- * @param {T} obj
- * @returns {T}
+ * @param {Record<string, any>} obj
+ * @returns {Record<string, any>}
  */
 function sortedObject(obj) {
   const out = {};
@@ -265,7 +241,12 @@ function sortedObject(obj) {
  * @returns {string}
  */
 function digestJSON(obj) {
-  return sha256(typeof obj === 'string' ? obj : JSON.stringify(obj));
+  if (typeof obj === 'string') return sha256(obj);
+  try {
+    return sha256(stringify(obj));
+  } catch {
+    return sha256(JSON.stringify(obj));
+  }
 }
 
 /**
@@ -285,10 +266,10 @@ function sha256(s) {
 // FS helper functions removed: using cacache or simple fs APIs inline
 
 /**
- * Build a digest string from versions of Node and relevant packages.
- * @returns {Promise<string>}
+ * Build a digest string from versions of Node and relevant packages (sync).
+ * @returns {string}
  */
-async function getToolchainDigest() {
+function getToolchainDigestSync() {
   const parts = [];
   parts.push(`node=${process.versions.node}`);
   for (const name of ['vite', 'astro', '@mdx-js/mdx', 'remark', 'rehype', 'expressive-code']) {
@@ -299,30 +280,23 @@ async function getToolchainDigest() {
 }
 
 /**
- * Safely read a package's version from its package.json using require.
+ * Promise wrapper for compatibility with existing callers/tests.
+ * @returns {Promise<string>}
+ */
+async function getToolchainDigest() {
+  return getToolchainDigestSync();
+}
+
+/**
+ * Safely read a package's version from its package.json using createRequire.
  * @param {string} name
  * @returns {string|undefined}
  */
 function safePkgVersion(name) {
   try {
     const pkg = require(`${name}/package.json`);
-    return pkg?.version ?? '0';
+    return pkg?.version ?? undefined;
   } catch {
-    // Fallback: resolve the entry and walk up to nearest package.json
-    try {
-      const entry = require.resolve(name);
-      let dir = path.dirname(entry);
-      const root = path.parse(dir).root;
-      while (dir && dir !== root) {
-        const pj = path.join(dir, 'package.json');
-        try {
-          const raw = fs.readFileSync(pj, 'utf8');
-          const parsed = JSON.parse(raw);
-          if (parsed?.version) return parsed.version;
-        } catch {}
-        dir = path.dirname(dir);
-      }
-    } catch {}
     return undefined;
   }
 }
@@ -379,50 +353,6 @@ function logSummary(state) {
 }
 
 /**
- * Compute a digest of the YAML config if present in the root.
- * Side-effect: sets `state.configDigest`.
- * @param {{root:string, configDigest:string}} state
- */
-function resolveConfigDigestSync(state) {
-  const root = state.root || process.cwd();
-  const candidates = ['fastmd.config.yml', 'fastmd.config.yaml'];
-  for (const f of candidates) {
-    try {
-      const p = path.join(root, f);
-      const raw = fs.readFileSync(p, 'utf8');
-      state.configDigest = sha256(normalizeNewlines(stripBOM(raw)));
-      return;
-    } catch {}
-  }
-  state.configDigest = '';
-}
-
-/**
- * Read YAML config from fastmd.config.yml/yaml and return a structured object.
- * Supports a simplified subset: root keys and one-level nested maps under `env` and `features`.
- * @param {string} rootDir
- */
-function loadYamlConfigSync(rootDir) {
-  const out = { root: {}, env: {} };
-  const candidates = ['fastmd.config.yml', 'fastmd.config.yaml'];
-  let raw = '';
-  for (const f of candidates) {
-    try {
-      raw = fs.readFileSync(path.join(rootDir, f), 'utf8');
-      break;
-    } catch {}
-  }
-  if (!raw) return out;
-  const parsed = parseYamlSimple(raw);
-  const env = parsed.env && typeof parsed.env === 'object' ? parsed.env : {};
-  const root = { ...parsed };
-  root.env = undefined;
-  out.root = root;
-  out.env = env;
-  return out;
-}
-
-/**
  * Pick known config keys only.
  * @param {any} src
  */
@@ -435,23 +365,6 @@ function pickKnownConfig(src) {
   if ('persist' in o) out.persist = o.persist;
   if ('log' in o) out.log = o.log;
   if ('features' in o) out.features = o.features;
-  return out;
-}
-
-/**
- * Shallow merge for config with special handling for `features` (deep merge one level).
- * Later properties override earlier ones.
- */
-function mergeConfig(a, b) {
-  /** @type {any} */
-  const out = { ...(a || {}) };
-  for (const k of Object.keys(b || {})) {
-    if (k === 'features') {
-      out.features = { ...(a?.features || {}), ...(b?.features || {}) };
-    } else {
-      out[k] = b[k];
-    }
-  }
   return out;
 }
 
@@ -470,90 +383,41 @@ function applyEnvOverrides(base, env) {
   return out;
 }
 
-/**
- * Very small YAML parser supporting root mapping and two nested levels.
- * Handles lines: `key: value` and nested blocks ending with `:` using 2-space indents.
- * Scalars parsed via parseScalar().
- * @param {string} text
- */
-function parseYamlSimple(text) {
-  const root = {};
-  /** @type {{obj:any, indent:number}[]} */
-  const stack = [{ obj: root, indent: -1 }];
-  const lines = normalizeNewlines(stripBOM(text)).split('\n');
-  for (const raw of lines) {
-    if (!raw.trim() || raw.trim().startsWith('#') || raw.trim() === '---') continue;
-    const indent = raw.match(/^\s*/)[0].length;
-    const line = raw.trimEnd();
-    while (stack.length && indent <= stack[stack.length - 1].indent) stack.pop();
-    const parent = stack[stack.length - 1].obj;
-    const m = line.match(/^([^:#]+):\s*(.*)$/);
-    if (!m) continue;
-    const key = m[1].trim();
-    const rest = m[2];
-    if (rest === '') {
-      // nested map
-      const obj = {};
-      parent[key] = obj;
-      stack.push({ obj, indent });
-    } else {
-      parent[key] = parseScalar(rest.trim());
-    }
-  }
-  return root;
-}
-
 // Expose internals for white-box tests (non-breaking for consumers)
 export const __internals = {
   createState,
-  loadYamlConfigSync,
-  pickKnownConfig,
-  mergeConfig,
-  applyEnvOverrides,
-  parseYamlSimple,
-  getStore,
-  CacacheStore,
   shouldProcess,
   normalizeId,
   stripBOM,
   normalizeNewlines,
   extractFrontmatter,
-  normalizeFrontmatter,
-  parseScalar,
   sortedObject,
   digestJSON,
   sha256,
   getToolchainDigest,
-  safePkgVersion,
   truthy,
-  now,
   fmtMs,
-  logLine,
-  logSummary,
-  resolveConfigDigestSync
+  logSummary
 };
 
 /**
- * Remove all cached data and metadata under the given cacheDir.
- * Does nothing if the directory does not exist.
- * @param {string} cacheDir base cache directory (e.g., .cache/fastmd)
+ * Clear the cacache store under the given cacheDir.
+ * Uses `cacache.rm.all` and then best-effort removes the directory.
+ * @param {string} cacheDir Base cache directory (e.g., `.cache/fastmd`).
  */
 export async function clearCache(cacheDir) {
   const base = path.resolve(process.cwd(), cacheDir || '.cache/fastmd');
-  const dir = path.join(base, 'cacache');
-  try {
-    const cacache = require('cacache');
-    await cacache.rm.all(dir);
-  } catch {}
+  await cacache.rm.all(base);
   // best-effort remove directory
-  await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
+  await fsp.rm(base, { recursive: true, force: true }).catch(() => {});
 }
 
 /**
- * Pre-populate cache entries given pairs of (id, code)->js.
- * This mirrors the key derivation used by the pre phase.
- * @param {{id:string; code:string; js:string; map?:string}[]} entries
- * @param {{cacheDir?:string; features?:Record<string, unknown>}} [opts]
+ * Pre-populate cache entries given pairs of (id, code) → js.
+ * Mirrors the key derivation used by the pre phase (content, frontmatter, features,
+ * toolchain, pathDigest, configDigest).
+ * @param {{id:string; code:string; js:string; map?:string}[]} entries Entries to warm.
+ * @param {{cacheDir?:string; features?:Record<string, unknown>}} [opts] Optional cacheDir/features.
  */
 export async function warmup(entries, opts = {}) {
   if (!Array.isArray(entries) || !entries.length) return;
@@ -563,23 +427,14 @@ export async function warmup(entries, opts = {}) {
 
   // Compute digests common to all
   const featuresDigest = digestJSON(sortedObject(features));
-  const toolchainDigest = await getToolchainDigest();
-  const st = { root, configDigest: '' };
-  resolveConfigDigestSync(st);
-  const configDigest = st.configDigest || '';
-
+  const toolchainDigest = getToolchainDigestSync();
   for (const e of entries) {
     const norm = normalizeId(e.id, root);
     const contentLF = normalizeNewlines(stripBOM(e.code));
-    const fm = extractFrontmatter(contentLF);
-    const frontmatterNorm = normalizeFrontmatter(fm);
+    const fmParsed = matter(contentLF);
+    const frontmatterNorm = stringify(fmParsed.data || {});
     const key = sha256(
-      contentLF +
-        frontmatterNorm +
-        featuresDigest +
-        toolchainDigest +
-        norm.pathDigest +
-        configDigest
+      contentLF + frontmatterNorm + featuresDigest + toolchainDigest + norm.pathDigest
     );
 
     const meta = {
@@ -590,68 +445,7 @@ export async function warmup(entries, opts = {}) {
       sizeBytes: Buffer.byteLength(e.js, 'utf8'),
       durationMs: 0
     };
-    const store = CacacheStore(base);
-    await store.put(key, e.js, e.map, meta);
+    const payload = JSON.stringify({ code: e.js, map: e.map, meta });
+    await cacache.put(base, key, Buffer.from(payload));
   }
-}
-
-/**
- * Select cache store implementation based on state.store.
- */
-function getStore(state) {
-  const base = state.cacheDir;
-  return CacacheStore(base);
-}
-
-/**
- * Filesystem store: stores code/map/meta under data/ and meta/.
- */
-// FSStore removed: cacache is now the single backend
-
-/**
- * cacache-backed store; falls back to JSON files under <base>/cacache when module is missing.
- */
-function CacacheStore(baseDir) {
-  let cacache;
-  try {
-    // optional dependency
-    // eslint-disable-next-line n/no-extraneous-require
-    cacache = require('cacache');
-  } catch {}
-  const dir = path.join(baseDir, 'cacache');
-  return {
-    async get(key) {
-      try {
-        if (cacache) {
-          const res = await cacache.get(dir, key);
-          const obj = JSON.parse(res.data.toString('utf8'));
-          return { code: obj.code, map: obj.map };
-        }
-      } catch {}
-      // fallback JSON file
-      try {
-        const fp = path.join(dir, `${key}.json`);
-        const raw = await fsp.readFile(fp, 'utf8');
-        const obj = JSON.parse(raw);
-        return { code: obj.code, map: obj.map };
-      } catch {
-        return null;
-      }
-    },
-    async put(key, code, map, meta) {
-      await fsp.mkdir(dir, { recursive: true });
-      const payload = JSON.stringify({ code, map, meta });
-      try {
-        if (cacache) {
-          await cacache.put(dir, key, Buffer.from(payload));
-          return;
-        }
-      } catch {}
-      // fallback JSON file, first-wins
-      const fp = path.join(dir, `${key}.json`);
-      try {
-        await fsp.writeFile(fp, payload, { flag: 'wx' });
-      } catch {}
-    }
-  };
 }

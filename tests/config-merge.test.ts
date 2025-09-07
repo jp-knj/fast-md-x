@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 /**
- * TDD: YAML config loader precedence (ENV → options → YAML env[NODE_ENV] → YAML root)
+ * Config precedence (minimal): ENV → options. YAML is not supported.
  */
 import { describe, expect, test } from 'bun:test';
 import fs from 'node:fs/promises';
@@ -26,10 +26,7 @@ async function withTempCwd(fn: (dir: string) => Promise<void>) {
 /**
  * Write a UTF-8 file, creating parent directories as needed.
  */
-async function writeFile(p: string, s: string) {
-  await fs.mkdir(path.dirname(p), { recursive: true });
-  await fs.writeFile(p, s, 'utf8');
-}
+// YAML is not supported; file helper removed
 
 /**
  * Check whether the cache data directory contains any JS entries.
@@ -38,43 +35,42 @@ async function writeFile(p: string, s: string) {
  * Check whether the given cacheDir contains a HIT for (id, code).
  */
 async function hasCacheHit(cacheDir: string, id: string, code: string): Promise<boolean> {
-  // Force enabled in options to bypass YAML env gating when checking presence.
-  const [pre] = fastmdCache({ cacheDir, log: 'silent', enabled: true });
-  const hit = await callTransform(pre as { transform?: TransformLike }, code, id);
-  return hit != null;
+  // Force enabled and isolate from ENV by temporarily unsetting cache overrides.
+  const prevCache = process.env.FASTMD_CACHE_DIR;
+  const prevDisable = process.env.FASTMD_DISABLE;
+  process.env.FASTMD_CACHE_DIR = undefined as unknown as string;
+  process.env.FASTMD_DISABLE = undefined as unknown as string;
+  try {
+    const [pre] = fastmdCache({ cacheDir, log: 'silent', enabled: true });
+    const hit = await callTransform(pre as unknown as { transform?: TransformLike }, code, id);
+    return hit != null;
+  } finally {
+    if (prevCache != null) process.env.FASTMD_CACHE_DIR = prevCache;
+    if (prevDisable != null) process.env.FASTMD_DISABLE = prevDisable;
+  }
 }
 
 describe('config merge order', () => {
-  test('options override YAML env which overrides YAML root', async () => {
+  test('ENV overrides options', async () => {
     await withTempCwd(async (dir) => {
-      process.env.NODE_ENV = 'test';
-      const yaml = [
-        'enabled: true',
-        'cacheDir: .cache/root',
-        'log: verbose',
-        'env:',
-        '  test:',
-        '    enabled: false',
-        '    cacheDir: .cache/env',
-        '    log: silent',
-        ''
-      ].join('\n');
-      await writeFile(path.join(dir, 'fastmd.config.yml'), yaml);
-
+      const prev = process.env.FASTMD_CACHE_DIR;
+      process.env.FASTMD_CACHE_DIR = '.cache/env';
       const [pre, post] = fastmdCache({ enabled: true, cacheDir: '.cache/opts', log: 'verbose' });
       const id = path.resolve(dir, 'doc.md');
       const code = '# hi';
-      expect(await callTransform(pre as { transform?: TransformLike }, code, id)).toBeNull();
-      await callTransform(post as { transform?: TransformLike }, 'export default 0', id);
+      expect(
+        await callTransform(pre as unknown as { transform?: TransformLike }, code, id)
+      ).toBeNull();
+      await callTransform(post as unknown as { transform?: TransformLike }, 'export default 0', id);
 
-      // Expect options cacheDir to be used (highest after ENV)
-      expect(await hasCacheHit(path.resolve(dir, '.cache/opts'), id, code)).toBe(true);
-      expect(await hasCacheHit(path.resolve(dir, '.cache/env'), id, code)).toBe(false);
-      expect(await hasCacheHit(path.resolve(dir, '.cache/root'), id, code)).toBe(false);
+      // ENV has higher precedence than options
+      expect(await hasCacheHit(path.resolve(dir, '.cache/env'), id, code)).toBe(true);
+      expect(await hasCacheHit(path.resolve(dir, '.cache/opts'), id, code)).toBe(false);
+      process.env.FASTMD_CACHE_DIR = prev;
     });
   });
 
-  test('ENV overrides everything: FASTMD_DISABLE and FASTMD_CACHE_DIR', async () => {
+  test('FASTMD_DISABLE disables caching even with options', async () => {
     await withTempCwd(async (dir) => {
       const prevDisable = process.env.FASTMD_DISABLE;
       const prevCache = process.env.FASTMD_CACHE_DIR;
@@ -82,47 +78,24 @@ describe('config merge order', () => {
         process.env.FASTMD_DISABLE = '1';
         process.env.FASTMD_CACHE_DIR = '.cache/envvar';
 
-        const yaml = ['enabled: true', 'cacheDir: .cache/root', ''].join('\n');
-        await writeFile(path.join(dir, 'fastmd.config.yml'), yaml);
-
         const [pre, post] = fastmdCache({ enabled: true, cacheDir: '.cache/opts' });
         const id = path.resolve(dir, 'doc.md');
         // Plugin disabled by ENV; no cache writes should occur
-        expect(await callTransform(pre as { transform?: TransformLike }, '# hi', id)).toBeNull();
-        await callTransform(post as { transform?: TransformLike }, 'export default 0', id);
+        expect(
+          await callTransform(pre as unknown as { transform?: TransformLike }, '# hi', id)
+        ).toBeNull();
+        await callTransform(
+          post as unknown as { transform?: TransformLike },
+          'export default 0',
+          id
+        );
 
         expect(await hasCacheHit(path.resolve(dir, '.cache/envvar'), id, '# hi')).toBe(false);
         expect(await hasCacheHit(path.resolve(dir, '.cache/opts'), id, '# hi')).toBe(false);
-        expect(await hasCacheHit(path.resolve(dir, '.cache/root'), id, '# hi')).toBe(false);
       } finally {
         process.env.FASTMD_DISABLE = prevDisable;
         process.env.FASTMD_CACHE_DIR = prevCache;
       }
-    });
-  });
-
-  test('YAML env[NODE_ENV] overrides YAML root when no options/env', async () => {
-    await withTempCwd(async (dir) => {
-      process.env.NODE_ENV = 'test';
-      const yaml = [
-        'enabled: false',
-        'cacheDir: .cache/root',
-        'env:',
-        '  test:',
-        '    enabled: true',
-        '    cacheDir: .cache/env',
-        ''
-      ].join('\n');
-      await writeFile(path.join(dir, 'fastmd.config.yml'), yaml);
-
-      const [pre, post] = fastmdCache();
-      const id = path.resolve(dir, 'doc.md');
-      const code = '# hi';
-      expect(await callTransform(pre as { transform?: TransformLike }, code, id)).toBeNull();
-      await callTransform(post as { transform?: TransformLike }, 'export default 0', id);
-
-      expect(await hasCacheHit(path.resolve(dir, '.cache/env'), id, code)).toBe(true);
-      expect(await hasCacheHit(path.resolve(dir, '.cache/root'), id, code)).toBe(false);
     });
   });
 });

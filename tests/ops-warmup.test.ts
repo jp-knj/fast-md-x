@@ -8,7 +8,6 @@
  */
 import { describe, expect, test } from 'bun:test';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import fastmdCache, { warmup } from '../plugins/fastmd-cache/index.mjs';
 import { type TransformLike, callTransform } from './_utils';
@@ -17,7 +16,9 @@ import { type TransformLike, callTransform } from './_utils';
  * Create a temporary working directory for tests.
  */
 async function mkTmp() {
-  return fs.mkdtemp(path.join(os.tmpdir(), 'fastmd-warm-'));
+  const dir = path.resolve(process.cwd(), `.cache/tests-warm-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  await fs.mkdir(dir, { recursive: true });
+  return dir;
 }
 
 describe('ops: warmup (TDD)', () => {
@@ -37,7 +38,7 @@ describe('ops: warmup (TDD)', () => {
 
     // Assert: a fresh plugin instance returns HIT for the same content
     const [pre] = fastmdCache({ cacheDir, log: 'silent' });
-    const hit = await callTransform(pre as { transform?: TransformLike }, code, id);
+    const hit = await callTransform(pre as unknown as { transform?: TransformLike }, code, id);
     expect(hit).toBe(js);
   });
 });

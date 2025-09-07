@@ -4,7 +4,6 @@
  */
 import { describe, expect, test } from 'bun:test';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import fastmdCache, { clearCache, warmup } from '../plugins/fastmd-cache/index.mjs';
 import { type TransformLike, callTransform } from './_utils';
@@ -13,7 +12,9 @@ import { type TransformLike, callTransform } from './_utils';
  * Create a temporary working directory for tests.
  */
 async function mkTmp() {
-  return fs.mkdtemp(path.join(os.tmpdir(), 'fastmd-cacache-'));
+  const dir = path.resolve(process.cwd(), `.cache/tests-cacache-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  await fs.mkdir(dir, { recursive: true });
+  return dir;
 }
 
 describe('store=cacache', () => {
@@ -24,10 +25,12 @@ describe('store=cacache', () => {
     const code = 'Hello';
     const js = 'export default 1;';
 
-    const [pre, post] = fastmdCache({ cacheDir, log: 'silent', store: 'cacache' });
-    expect(await callTransform(pre as { transform?: TransformLike }, code, id)).toBeNull();
-    await callTransform(post as { transform?: TransformLike }, js, id);
-    const hit = await callTransform(pre as { transform?: TransformLike }, code, id);
+    const [pre, post] = fastmdCache({ cacheDir, log: 'silent' });
+    expect(
+      await callTransform(pre as unknown as { transform?: TransformLike }, code, id)
+    ).toBeNull();
+    await callTransform(post as unknown as { transform?: TransformLike }, js, id);
+    const hit = await callTransform(pre as unknown as { transform?: TransformLike }, code, id);
     expect(hit).toBe(js);
 
     // Using cacache store should not create per-key files under data/
@@ -46,9 +49,9 @@ describe('store=cacache', () => {
     const code = 'Hi';
     const js = 'export default 2;';
 
-    await warmup([{ id, code, js }], { cacheDir, features: {}, store: 'cacache' });
-    const [pre] = fastmdCache({ cacheDir, log: 'silent', store: 'cacache' });
-    const hit = await callTransform(pre as { transform?: TransformLike }, code, id);
+    await warmup([{ id, code, js }], { cacheDir, features: {} });
+    const [pre] = fastmdCache({ cacheDir, log: 'silent' });
+    const hit = await callTransform(pre as unknown as { transform?: TransformLike }, code, id);
     expect(hit).toBe(js);
 
     // No data/ directory created for cacache store
@@ -66,14 +69,16 @@ describe('store=cacache', () => {
     const code = 'Yo';
     const js = 'export default 3;';
 
-    const [pre, post] = fastmdCache({ cacheDir, log: 'silent', store: 'cacache' });
-    expect(await callTransform(pre as { transform?: TransformLike }, code, id)).toBeNull();
-    await callTransform(post as { transform?: TransformLike }, js, id);
-    const hit = await callTransform(pre as { transform?: TransformLike }, code, id);
+    const [pre, post] = fastmdCache({ cacheDir, log: 'silent' });
+    expect(
+      await callTransform(pre as unknown as { transform?: TransformLike }, code, id)
+    ).toBeNull();
+    await callTransform(post as unknown as { transform?: TransformLike }, js, id);
+    const hit = await callTransform(pre as unknown as { transform?: TransformLike }, code, id);
     expect(hit).toBe(js);
 
     await clearCache(cacheDir);
-    const miss = await callTransform(pre as { transform?: TransformLike }, code, id);
+    const miss = await callTransform(pre as unknown as { transform?: TransformLike }, code, id);
     expect(miss).toBeNull();
   });
 });

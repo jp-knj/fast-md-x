@@ -3,14 +3,11 @@
  * fastmd-cache — internal invariants coverage
  */
 import { describe, expect, test } from 'bun:test';
-import fs from 'node:fs/promises';
-import os from 'node:os';
+// removed unused fs/os imports
 import path from 'node:path';
 import fastmdCache, { __internals } from '../plugins/fastmd-cache/index.mjs';
 
-function tmpdir(label = 'inv') {
-  return fs.mkdtemp(path.join(os.tmpdir(), `fastmd-${label}-`));
-}
+// tmpdir helper removed (no longer used)
 
 describe('helpers: shouldProcess', () => {
   test('detects md/mdx only', () => {
@@ -42,13 +39,11 @@ describe('helpers: text + YAML normalization', () => {
     expect(__internals.normalizeNewlines(__internals.stripBOM(s))).toBe('line1\nline2\nline3\n');
   });
 
-  test('extractFrontmatter and normalizeFrontmatter scalars', () => {
-    const yaml = 'b: 2\na: "x"\nflag: true\nnone: null\nnum: 1.5';
-    const content = `---\n${yaml}\n---\nBody`;
+  test('extractFrontmatter returns raw block text', () => {
+    const block = 'title: X\nflag: true\nnum: 1.5';
+    const content = `---\n${block}\n---\nBody`;
     const fm = __internals.extractFrontmatter(content);
-    const norm = __internals.normalizeFrontmatter(fm);
-    // sorted keys and typed values
-    expect(norm).toBe('{"a":"x","b":2,"flag":true,"none":null,"num":1.5}');
+    expect(fm).toBe(block);
   });
 });
 
@@ -76,16 +71,7 @@ describe('helpers: toolchain + config', () => {
     expect(s.includes('astro=')).toBe(true);
   });
 
-  test('resolveConfigDigestSync reads YAML when present', async () => {
-    const dir = await tmpdir('cfg');
-    const yml = 'x: 1\n';
-    await fs.writeFile(path.join(dir, 'fastmd.config.yml'), yml, 'utf8');
-    const st = { root: dir, configDigest: '' };
-    __internals.resolveConfigDigestSync(st);
-    expect(st.configDigest).toBe(
-      __internals.sha256(__internals.normalizeNewlines(__internals.stripBOM(yml)))
-    );
-  });
+  // YAML config removed: no digest test
 });
 
 describe('helpers: misc', () => {

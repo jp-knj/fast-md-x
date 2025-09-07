@@ -36,6 +36,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint (Biome)
         run: pnpm check
+      - name: Typecheck (tsc)
+        run: pnpm typecheck
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:

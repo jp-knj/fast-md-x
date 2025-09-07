@@ -24,15 +24,19 @@ describe('fastmd-cache: normalization invariants', () => {
     {
       const [pre, post] = fastmdCache({ cacheDir, log: 'silent' });
       expect(
-        await callTransform(pre as { transform?: TransformLike }, withBOM_CRLF, abs)
+        await callTransform(pre as unknown as { transform?: TransformLike }, withBOM_CRLF, abs)
       ).toBeNull();
-      await callTransform(post as { transform?: TransformLike }, js, abs);
+      await callTransform(post as unknown as { transform?: TransformLike }, js, abs);
     }
 
     // Second instance reads using LF-normalized input => HIT must return same JS
     {
       const [pre] = fastmdCache({ cacheDir, log: 'silent' });
-      const hit = await callTransform(pre as { transform?: TransformLike }, normalizedLF, abs);
+      const hit = await callTransform(
+        pre as unknown as { transform?: TransformLike },
+        normalizedLF,
+        abs
+      );
       expect(hit).toBe(js);
     }
   });
@@ -47,14 +51,16 @@ describe('fastmd-cache: normalization invariants', () => {
     // Write using /@fs/ URL form
     {
       const [pre, post] = fastmdCache({ cacheDir, log: 'silent' });
-      expect(await callTransform(pre as { transform?: TransformLike }, md, viaFsUrl)).toBeNull();
-      await callTransform(post as { transform?: TransformLike }, js, viaFsUrl);
+      expect(
+        await callTransform(pre as unknown as { transform?: TransformLike }, md, viaFsUrl)
+      ).toBeNull();
+      await callTransform(post as unknown as { transform?: TransformLike }, js, viaFsUrl);
     }
 
     // Read using absolute path form -> should HIT
     {
       const [pre] = fastmdCache({ cacheDir, log: 'silent' });
-      const hit = await callTransform(pre as { transform?: TransformLike }, md, abs);
+      const hit = await callTransform(pre as unknown as { transform?: TransformLike }, md, abs);
       expect(hit).toBe(js);
     }
   });
