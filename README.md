@@ -73,6 +73,37 @@ Enable native Git hooks (no extra dependencies):
 
 To disable later: `git config --unset core.hooksPath`
 
+## Runtime Configuration (ENV-first)
+
+fastmd-cache honors environment variables first, then plugin options (ENV > options). YAML files are not read in Phase 1.
+
+- FASTMD_LOG: controls logging
+  - Values: `silent` | `summary` (default) | `verbose`
+  - Examples:
+    - `FASTMD_LOG=verbose pnpm dev` (detailed HIT/MISS lines)
+    - `FASTMD_LOG=silent pnpm build` (no output)
+  - Sample:
+    - Verbose: `[fastmd] HIT  3ms  docs/intro.md`
+    - Summary: `[fastmd] summary total=120 hits=96 misses=24 hitRate=80% p50=5ms p95=28ms`
+
+- FASTMD_SALT: app-specific salt in key derivation
+  - Purpose: isolate cache domains across similar repos or CI contexts
+  - Default: empty
+  - Example: `FASTMD_SALT=docs-site-2025 pnpm build`
+
+- FASTMD_CACHE_DIR: cache location
+  - Overrides auto-resolved directory (see “Cache Backend” above)
+  - Examples:
+    - `FASTMD_CACHE_DIR=.cache/fastmd pnpm dev`
+    - `FASTMD_CACHE_DIR=/tmp/fastmd-cache pnpm build`
+
+- FASTMD_DISABLE: disable the plugin (useful for debugging/CI)
+  - `FASTMD_DISABLE=1 pnpm dev`
+
+Notes
+- Precedence: environment variables override plugin options.
+- Supported Node/Vite/Astro: Node 22, Vite 5, Astro 5 (pinned in package.json).
+
 ## Spec-kit (light) — 使い方
 
 1. 雛形作成: `scripts/create-new-feature.sh <ID> <slug>` 例: `scripts/create-new-feature.sh 001 sample`
