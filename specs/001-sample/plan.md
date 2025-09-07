@@ -1,0 +1,3 @@
+- Add AGENTS.md + templates + memory
+- Provide script to create new feature
+- Keep changes non-destructive; CI は提案のみ
