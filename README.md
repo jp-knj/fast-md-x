@@ -153,3 +153,16 @@ FASTMD_LOG=json pnpm build | tee fastmd.ndjson
   - Or specify target/cache: `pnpm bench -- examples/minimal .cache/bench-fastmd --pages 200 --lines 400`
 - One-off generation (writes into the given example directory):
   - `node scripts/gen-example-pages.mjs examples/minimal 100 docs 300`
+
+### Changes scenario (HIT/MISS 混在の測定)
+
+「1ファイルだけ更新」して、HIT/MISS 混在時の savedMs を確認します。
+
+```bash
+pnpm bench -- --pages 200 --lines 200 --changes
+# 出力例:
+# - cold   : 4666 ms (hits=0/201,  savedMs=0ms)
+# - warm   : 5817 ms (hits=201/201, savedMs=33177ms)
+# - hit    : 4216 ms (hits=201/201, savedMs=33177ms)
+# - change1: 4270 ms (hits=200/201, savedMs=33143ms)
+```

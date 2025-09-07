@@ -1,0 +1,70 @@
+name: fastmd metrics (history)
+
+on:
+  workflow_run:
+    workflows: ["Deploy to GitHub Pages"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: List last 30 runs for this workflow
+        id: runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const wfId = context.payload.workflow_run.workflow_id;
+            const { data } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: wfId,
+              per_page: 30
+            });
+            const runs = data.workflow_runs.map(r => ({ id: r.id, html_url: r.html_url, head_sha: r.head_sha, created_at: r.created_at }));
+            const fs = require('fs');
+            fs.writeFileSync('runs.json', JSON.stringify(runs, null, 2));
+
+      - name: Aggregate artifacts -> metrics.csv
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p metrics out
+          # Prepare CSV (without header)
+          : > metrics/fastmd-metrics.csv
+          # Iterate runs
+          node -e 'console.log(JSON.parse(require("fs").readFileSync("runs.json","utf8")).length)'
+          node -e 'for (const r of JSON.parse(require("fs").readFileSync("runs.json","utf8"))) console.log(`${r.id}\t${r.created_at}\t${r.head_sha}\t${r.html_url}`)' | while IFS=$'\t' read -r id created sha url; do
+            echo "[metrics] run $id"
+            curl -sSL -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/$id/artifacts" > "out/artifacts-$id.json"
+            art_id=$(jq -r '.artifacts[] | select(.name=="fastmd-ndjson") | .id' "out/artifacts-$id.json") || true
+            if [ -z "${art_id}" ] || [ "${art_id}" = "null" ]; then echo "[metrics] skip $id (no artifact)"; continue; fi
+            curl -sSL -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+              -o "out/fastmd-$id.zip" "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${art_id}/zip"
+            mkdir -p "out/z-$id"
+            unzip -q -o "out/fastmd-$id.zip" -d "out/z-$id" || true
+            f=$(ls "out/z-$id" | head -n1)
+            if [ -z "$f" ]; then echo "[metrics] empty artifact for $id"; continue; fi
+            node scripts/ndjson-to-metrics.mjs "out/z-$id/$f" "$id" "$created" "$sha" "$url" >> metrics/fastmd-metrics.csv
+          done
+          # Prepend header
+          tmp=$(mktemp)
+          echo "run_id,created_at,sha,workflow_url,total,hits,misses,hitRate,p50,p95,savedMs" > "$tmp"
+          cat metrics/fastmd-metrics.csv >> "$tmp" || true
+          mv "$tmp" metrics/fastmd-metrics.csv
+
+      - name: Upload metrics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastmd-metrics
+          path: metrics/fastmd-metrics.csv
+
