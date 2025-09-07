@@ -38,8 +38,10 @@ export default function fastmdCache(userOptions = {}) {
       try {
         /** @type {any} */
         const anyCfg = cfg || {};
-        state.viteCommand = anyCfg.command || (process.env.NODE_ENV === 'production' ? 'build' : 'serve');
-        state.viteMode = anyCfg.mode || (process.env.NODE_ENV === 'production' ? 'production' : 'development');
+        state.viteCommand =
+          anyCfg.command || (process.env.NODE_ENV === 'production' ? 'build' : 'serve');
+        state.viteMode =
+          anyCfg.mode || (process.env.NODE_ENV === 'production' ? 'production' : 'development');
       } catch {}
     },
     async transform(code, id) {
@@ -47,6 +49,7 @@ export default function fastmdCache(userOptions = {}) {
       if (!state.enabled) return null;
 
       const s0 = now();
+      const norm = normalizeId(id, state.root);
       const toolchainDigest = state.toolchainDigest || getToolchainDigestSync();
       // attempt to capture a representative importer (first) for added safety
       let importer = '';
@@ -62,7 +65,7 @@ export default function fastmdCache(userOptions = {}) {
         root: state.root,
         features: state.features,
         toolchainDigest,
-        mode: (state.viteCommand === 'serve' ? 'dev' : 'build'),
+        mode: state.viteCommand === 'serve' ? 'dev' : 'build',
         salt: state.salt || '',
         importer
       });
@@ -141,7 +144,7 @@ export default function fastmdCache(userOptions = {}) {
  * Build internal, resolved state for a plugin instance.
  * Honors environment variables first, then user options.
  * @param {object} userOptions
- * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, features:object, stats:{hits:number,misses:number,durations:number[]}, pending:Map<string, any>, toolchainDigest:string}}
+ * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, salt:string, features:object, stats:{hits:number,misses:number,durations:number[]}, pending:Map<string, any>, toolchainDigest:string, viteCommand:string, viteMode:string}}
  */
 function createState(userOptions) {
   const env = process.env;
@@ -489,6 +492,7 @@ function computeKey(p) {
   const norm = normalizeId(p.id, p.root);
   const contentLF = normalizeNewlines(stripBOM(p.code));
   const fmParsed = matter(contentLF);
+  const contentBody = fmParsed.content ?? contentLF; // exclude FM when present
   const frontmatterNorm = stringify(fmParsed.data || {});
   const featuresDigest = digestJSON(sortedObject(p.features || {}));
   const modeTag = p.mode === 'dev' ? 'dev' : 'build';
@@ -503,16 +507,6 @@ function computeKey(p) {
     }
   }
   return sha256(
-    contentLF +
-      frontmatterNorm +
-      featuresDigest +
-      (p.toolchainDigest || '') +
-      norm.pathDigest +
-      '|' +
-      modeTag +
-      '|' +
-      salt +
-      '|' +
-      importerDigest
+    `${contentBody}${frontmatterNorm}${featuresDigest}${p.toolchainDigest || ''}${norm.pathDigest}|${modeTag}|${salt}|${importerDigest}`
   );
 }

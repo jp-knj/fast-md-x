@@ -16,7 +16,10 @@ import { type TransformLike, callTransform } from './_utils';
  * Create a temporary working directory for tests.
  */
 async function mkTmp() {
-  const dir = path.resolve(process.cwd(), `.cache/tests-clear-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const dir = path.resolve(
+    process.cwd(),
+    `.cache/tests-clear-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
   await fs.mkdir(dir, { recursive: true });
   return dir;
 }

@@ -9,13 +9,23 @@
  * - Path invariants: /@fs/ and case-normalized POSIX relpath yield same key
  */
 import { describe, expect, test } from 'bun:test';
-// Import internals; the helper may not exist yet (TDD: expect this to fail initially)
+// White-box import of internals from .mjs (typed minimally for tests)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-// @ts-ignore – ESM .mjs without types; cast to any for white-box tests
+// @ts-ignore – ESM .mjs without types; cast to a minimal interface
 import { __internals as I } from '../plugins/fastmd-cache/index.mjs';
 
-// Cast to any to avoid TS compile errors until helper exists
-const internals: any = I as any;
+type ComputeArgs = {
+  code: string;
+  id: string;
+  root: string;
+  features: Record<string, unknown>;
+  toolchainDigest: string;
+  mode: 'dev' | 'build' | 'prod';
+  salt?: string;
+  importer?: string;
+};
+type Internals = { computeKey?: (args: ComputeArgs) => string };
+const internals = I as unknown as Internals;
 
 // Common fixture values
 const root = '/repo';
@@ -91,4 +101,3 @@ describe('computeKey()', () => {
     expect(k1).toBe(k2);
   });
 });
-
