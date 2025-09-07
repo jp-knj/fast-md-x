@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "knip": "knip",
     "setup:hooks": "bash scripts/setup-git-hooks.sh",
-    "precommit:run": "pnpm check && pnpm typecheck"
+    "precommit:run": "pnpm check && pnpm typecheck",
+    "bench": "node scripts/bench.mjs"
   },
   "dependencies": {
     "astro": "5.13.5",
