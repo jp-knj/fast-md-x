@@ -11,6 +11,7 @@ async function main() {
   let total = 0;
   let p50 = 0;
   let p95 = 0;
+  let savedMs = 0;
   for (const line of lines) {
     try {
       const row = JSON.parse(line);
@@ -21,6 +22,7 @@ async function main() {
         total = row.total ?? total;
         p50 = row.p50 ?? p50;
         p95 = row.p95 ?? p95;
+        if (typeof row.savedMs === 'number') savedMs = row.savedMs;
         if (typeof row.hits === 'number') hits = row.hits;
         if (typeof row.misses === 'number') misses = row.misses;
       }
@@ -35,6 +37,7 @@ async function main() {
   out.push(`- hits/misses: ${hits}/${misses} (hitRate=${hitRate}%)`);
   out.push(`- writes: ${writes}`);
   out.push(`- p50/p95 (ms): ${p50}/${p95}`);
+  out.push(`- savedMs (est.): ${savedMs} ms`);
   console.log(out.join('\n'));
 }
 

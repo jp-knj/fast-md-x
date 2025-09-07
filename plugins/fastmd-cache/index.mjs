@@ -76,6 +76,11 @@ export default function fastmdCache(userOptions = {}) {
         const got = JSON.parse(res.data.toString('utf8'));
         state.stats.hits++;
         const dt = now() - s0;
+        // accumulate estimated saved time using prior MISS duration (if present)
+        if (got?.meta?.durationMs != null) {
+          const n = Number(got.meta.durationMs) || 0;
+          state.stats.savedMs = (state.stats.savedMs || 0) + (n > 0 ? n : 0);
+        }
         if (state.logLevel === 'verbose') logLine(`HIT  ${fmtMs(dt)}  ${norm.rel}`);
         if (state.logLevel === 'json')
           logJSON('cache_hit', {
@@ -93,7 +98,7 @@ export default function fastmdCache(userOptions = {}) {
       return null;
     },
     buildStart() {
-      state.stats = { hits: 0, misses: 0, durations: [] };
+      state.stats = { hits: 0, misses: 0, durations: [], savedMs: 0 };
     },
     buildEnd() {
       if (state.logLevel === 'json') {
@@ -162,7 +167,7 @@ export default function fastmdCache(userOptions = {}) {
  * Build internal, resolved state for a plugin instance.
  * Honors environment variables first, then user options.
  * @param {object} userOptions
- * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, salt:string, features:object, stats:{hits:number,misses:number,durations:number[]}, pending:Map<string, any>, toolchainDigest:string, viteCommand:string, viteMode:string}}
+ * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, salt:string, features:object, stats:{hits:number,misses:number,durations:number[],savedMs:number}, pending:Map<string, any>, toolchainDigest:string, viteCommand:string, viteMode:string}}
  */
 function createState(userOptions) {
   const env = process.env;
@@ -195,7 +200,7 @@ function createState(userOptions) {
     salt,
     cacheDir,
     features,
-    stats: { hits: 0, misses: 0, durations: [] },
+    stats: { hits: 0, misses: 0, durations: [], savedMs: 0 },
     pending: new Map(),
     toolchainDigest: '',
     viteCommand: 'build',
@@ -380,7 +385,7 @@ function logLine(s) {
 
 /**
  * Log a summary line of cache statistics.
- * @param {{stats:{hits:number,misses:number,durations:number[]}}} state
+ * @param {{stats:{hits:number,misses:number,durations:number[],savedMs?:number}}} state
  */
 function logSummary(state) {
   const total = state.stats.hits + state.stats.misses;
@@ -391,7 +396,7 @@ function logSummary(state) {
   logLine(
     `summary total=${total} hits=${state.stats.hits} misses=${state.stats.misses} hitRate=${hitRate}% p50=${fmtMs(
       p50
-    )} p95=${fmtMs(p95)}`
+    )} p95=${fmtMs(p95)} savedMs=${fmtMs(state.stats.savedMs || 0)}`
   );
 }
 
@@ -409,7 +414,7 @@ function logJSON(evt, fields) {
 
 /**
  * Log a JSON summary row.
- * @param {{stats:{hits:number,misses:number,durations:number[]}}} state
+ * @param {{stats:{hits:number,misses:number,durations:number[],savedMs?:number}}} state
  */
 function logSummaryJSON(state) {
   const total = state.stats.hits + state.stats.misses;
@@ -423,7 +428,8 @@ function logSummaryJSON(state) {
     misses: state.stats.misses,
     hitRate,
     p50,
-    p95
+    p95,
+    savedMs: state.stats.savedMs || 0
   });
 }
 

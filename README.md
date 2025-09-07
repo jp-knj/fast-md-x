@@ -84,10 +84,10 @@ fastmd-cache honors environment variables first, then plugin options (ENV > opti
     - `FASTMD_LOG=silent pnpm build` (no output)
   - Sample:
     - Verbose: `[fastmd] HIT  3ms  docs/intro.md`
-    - Summary: `[fastmd] summary total=120 hits=96 misses=24 hitRate=80% p50=5ms p95=28ms`
+    - Summary: `[fastmd] summary total=120 hits=96 misses=24 hitRate=80% p50=5ms p95=28ms savedMs=2400ms`
   - NDJSON: `FASTMD_LOG=json` で JSON 行を出力（集計/収集向け）
     - 例: `{"evt":"cache_hit","ts":"2025-09-07T12:34:56.789Z","rel":"docs/x.md","durationMs":3}`
-    - 例: `{"evt":"summary","total":120,"hits":96,"misses":24,"hitRate":80,"p50":5,"p95":28}`
+    - 例: `{"evt":"summary","total":120,"hits":96,"misses":24,"hitRate":80,"p50":5,"p95":28,"savedMs":2400}`
 
 - FASTMD_SALT: app-specific salt in key derivation
   - Purpose: isolate cache domains across similar repos or CI contexts
