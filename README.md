@@ -62,6 +62,17 @@ Notes:
 - Clear cache: `rm -rf .cache/fastmd` (or use the exported helper `clearCache('.cache/fastmd')`).
 - The `store` option/ENV (`FASTMD_STORE`) and YAML key are no longer supported; cacache is always used.
 
+## Git Hooks
+
+Enable native Git hooks (no extra dependencies):
+
+1. `pnpm run setup:hooks` (sets `core.hooksPath` to `.githooks/` and marks hooks executable)
+2. Commit as usual; pre-commit runs:
+   - `pnpm check` (Biome lint/format)
+   - `pnpm typecheck` (TypeScript, no emit)
+
+To disable later: `git config --unset core.hooksPath`
+
 ## Spec-kit (light) — 使い方
 
 1. 雛形作成: `scripts/create-new-feature.sh <ID> <slug>` 例: `scripts/create-new-feature.sh 001 sample`
