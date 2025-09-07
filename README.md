@@ -61,3 +61,9 @@ Notes:
 - Default location: resolved with `find-cache-dir({ name: 'fastmd', create: true })`; falls back to `./.cache/fastmd` if unavailable. Override with `FASTMD_CACHE_DIR` or `cacheDir` option.
 - Clear cache: `rm -rf .cache/fastmd` (or use the exported helper `clearCache('.cache/fastmd')`).
 - The `store` option/ENV (`FASTMD_STORE`) and YAML key are no longer supported; cacache is always used.
+
+## Spec-kit (light) — 使い方
+
+1. 雛形作成: `scripts/create-new-feature.sh <ID> <slug>` 例: `scripts/create-new-feature.sh 001 sample`
+2. 編集: `specs/<ID>-<slug>/{spec.md,plan.md,tasks.md}` を埋め、PR に spec/plan のリンクを追記
+3. 実行/検証: `pnpm check && pnpm typecheck && pnpm test` が通ること（CI は既存設定を使用）
