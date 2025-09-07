@@ -85,6 +85,9 @@ fastmd-cache honors environment variables first, then plugin options (ENV > opti
   - Sample:
     - Verbose: `[fastmd] HIT  3ms  docs/intro.md`
     - Summary: `[fastmd] summary total=120 hits=96 misses=24 hitRate=80% p50=5ms p95=28ms`
+  - NDJSON: `FASTMD_LOG=json` で JSON 行を出力（集計/収集向け）
+    - 例: `{"evt":"cache_hit","ts":"2025-09-07T12:34:56.789Z","rel":"docs/x.md","durationMs":3}`
+    - 例: `{"evt":"summary","total":120,"hits":96,"misses":24,"hitRate":80,"p50":5,"p95":28}`
 
 - FASTMD_SALT: app-specific salt in key derivation
   - Purpose: isolate cache domains across similar repos or CI contexts
@@ -103,6 +106,36 @@ fastmd-cache honors environment variables first, then plugin options (ENV > opti
 Notes
 - Precedence: environment variables override plugin options.
 - Supported Node/Vite/Astro: Node 22, Vite 5, Astro 5 (pinned in package.json).
+
+## 導入手順（最小）
+
+astro.config.mjs にプラグインを追加:
+
+```js
+import { defineConfig } from 'astro/config';
+import fastmdCache from './plugins/fastmd-cache/index.mjs';
+
+export default defineConfig({
+  vite: {
+    plugins: fastmdCache({ log: 'summary' })
+  }
+});
+```
+
+環境変数例（ローカル/CI）:
+
+```bash
+FASTMD_LOG=summary pnpm build
+# JSON ログを収集:
+FASTMD_LOG=json pnpm build | tee fastmd.ndjson
+```
+
+## 既知の制限（Phase 1）
+
+- キャッシュ対象は「MD/MDX → JS 変換」のみ。Astro の SSG/バンドルは対象外のため、
+  小規模サイトでは全体時間短縮がノイズに埋もれることがある。
+- 依存 fingerprint は Node/主要パッケージのバージョンを含み、更新時は適切にキーが変わる。
+- dev/HMR 最適化は対象外（Phase 2 以降）。
 
 ## Spec-kit (light) — 使い方
 

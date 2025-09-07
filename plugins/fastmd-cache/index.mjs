@@ -77,17 +77,29 @@ export default function fastmdCache(userOptions = {}) {
         state.stats.hits++;
         const dt = now() - s0;
         if (state.logLevel === 'verbose') logLine(`HIT  ${fmtMs(dt)}  ${norm.rel}`);
+        if (state.logLevel === 'json')
+          logJSON('cache_hit', {
+            rel: norm.rel,
+            durationMs: dt,
+            sizeBytes: got?.meta?.sizeBytes,
+            toolchainDigest: got?.meta?.toolchainDigest
+          });
         return got.map ? { code: got.code, map: got.map } : got.code;
       } catch {}
       // MISS: record intent to store after pipeline finishes in post phase
       state.pending.set(norm.rel, { key, startedAt: s0, rel: norm.rel });
       if (state.logLevel === 'verbose') logLine(`MISS(new)  --  ${norm.rel}`);
+      if (state.logLevel === 'json') logJSON('cache_miss', { rel: norm.rel });
       return null;
     },
     buildStart() {
       state.stats = { hits: 0, misses: 0, durations: [] };
     },
     buildEnd() {
+      if (state.logLevel === 'json') {
+        logSummaryJSON(state);
+        return;
+      }
       if (state.logLevel !== 'silent') logSummary(state);
     }
   };
@@ -127,9 +139,15 @@ export default function fastmdCache(userOptions = {}) {
       state.pending.delete(norm.rel);
       state.stats.misses++;
       state.stats.durations.push(duration);
+      if (state.logLevel === 'json')
+        logJSON('cache_write', { rel: norm.rel, durationMs: duration, sizeBytes: meta.sizeBytes });
       return null; // do not alter code; just observe
     },
     buildEnd() {
+      if (state.logLevel === 'json') {
+        logSummaryJSON(state);
+        return;
+      }
       if (state.logLevel !== 'silent') logSummary(state);
     }
   };
@@ -375,6 +393,38 @@ function logSummary(state) {
       p50
     )} p95=${fmtMs(p95)}`
   );
+}
+
+/**
+ * Log a JSON line for an event (NDJSON-friendly).
+ * @param {string} evt
+ * @param {Record<string, any>} fields
+ */
+function logJSON(evt, fields) {
+  try {
+    const row = { evt, ts: new Date().toISOString(), ...fields };
+    console.log(JSON.stringify(row));
+  } catch {}
+}
+
+/**
+ * Log a JSON summary row.
+ * @param {{stats:{hits:number,misses:number,durations:number[]}}} state
+ */
+function logSummaryJSON(state) {
+  const total = state.stats.hits + state.stats.misses;
+  const hitRate = total ? Math.round((state.stats.hits / total) * 100) : 0;
+  const arr = state.stats.durations.slice().sort((a, b) => a - b);
+  const p50 = arr.length ? arr[Math.floor(arr.length * 0.5)] : 0;
+  const p95 = arr.length ? arr[Math.floor(arr.length * 0.95)] : 0;
+  logJSON('summary', {
+    total,
+    hits: state.stats.hits,
+    misses: state.stats.misses,
+    hitRate,
+    p50,
+    p95
+  });
 }
 
 /**
