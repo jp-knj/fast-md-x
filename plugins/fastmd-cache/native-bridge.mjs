@@ -5,7 +5,12 @@ import { createRequire } from 'node:module';
 export function loadFastmdNative() {
   if (process.env.FASTMD_NATIVE !== '1') return null;
   const require = createRequire(import.meta.url);
-  const candidates = ['@fastmd/native', '../../native/fastmd-native/index.js'];
+  const injected = process.env.FASTMD_NATIVE_MODULE;
+  const candidates = [
+    injected && String(injected),
+    '@fastmd/native',
+    '../../native/fastmd-native/index.js'
+  ].filter(Boolean);
   for (const id of candidates) {
     try {
       const mod = require(id);
