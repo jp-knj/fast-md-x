@@ -171,6 +171,8 @@ node scripts/print-digest.mjs path/to/a.md path/to/b.mdx           # JS digest o
 FASTMD_NATIVE=1 node scripts/print-digest.mjs a.md b.mdx --native  # JS vs Native, compare
 ```
 
+Contributor guide: see `docs/native-build.md` for local build instructions.
+
 ## Spec-kit (light) — 使い方
 
 1. 雛形作成: `scripts/create-new-feature.sh <ID> <slug>` 例: `scripts/create-new-feature.sh 001 sample`
