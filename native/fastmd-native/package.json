@@ -1,0 +1,9 @@
+{
+  "name": "@fastmd/native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native addon for fast-md-x (experimental)",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "UNLICENSED"
+}

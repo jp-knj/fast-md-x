@@ -2,7 +2,13 @@ import crypto from 'node:crypto';
 import fsp from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cacache from 'cacache';
+import picomatch from 'picomatch';
+import pino from 'pino';
+import slash from 'slash';
+import { z } from 'zod';
+import { depsDigestNative, loadFastmdNative } from './native-bridge.mjs';
 
 const require = createRequire(import.meta.url);
 const matter = require('gray-matter');
@@ -29,6 +35,7 @@ export default function fastmdCache(userOptions = {}) {
   const pre = {
     name: 'fastmd-cache-pre',
     enforce: 'pre',
+    apply: 'build',
     configResolved(cfg) {
       state.root = cfg.root || process.cwd();
       // record bundler mode for keying (dev/prod)
@@ -37,6 +44,9 @@ export default function fastmdCache(userOptions = {}) {
       } catch {}
       // compute toolchain digest once
       state.toolchainDigest = getToolchainDigestSync(state.trackDependencies || 'strict');
+      if (state.logLevel === 'json' && !state.logger) {
+        state.logger = createJsonLogger();
+      }
     },
     async transform(code, id) {
       if (!shouldProcess(id, state)) return null;
@@ -52,11 +62,60 @@ export default function fastmdCache(userOptions = {}) {
       const featuresDigest = digestJSON(sortedObject(state.features));
       const toolchainDigest =
         state.toolchainDigest || getToolchainDigestSync(state.trackDependencies || 'strict');
+
+      // Optional strict dependency tracking: include stat info of imported files in key
+      let depsDigest = '';
+      if (state.trackDependencies === 'strict') {
+        try {
+          const info = /** @type {any} */ (this)?.getModuleInfo?.(id);
+          const depIds = new Set([
+            ...((info?.importedIds ?? []) || []),
+            ...((info?.dynamicallyImportedIds ?? []) || [])
+          ]);
+          if (depIds.size) {
+            // Try native fast path first (optional)
+            const absPaths = Array.from(depIds)
+              .map((d) => {
+                let fp = d;
+                if (typeof fp === 'string' && fp.startsWith('file://')) {
+                  try {
+                    fp = fileURLToPath(fp);
+                  } catch {}
+                }
+                if (!path.isAbsolute(fp) && fp.startsWith('/@fs/')) {
+                  fp = fp.replace(/^\/@@?fs\/+/, '/');
+                }
+                return path.isAbsolute(fp) ? fp : '';
+              })
+              .filter(Boolean)
+              .sort();
+
+            const native = loadFastmdNative();
+            const nativeDigest = depsDigestNative(absPaths, native);
+            if (nativeDigest) {
+              depsDigest = nativeDigest;
+            } else {
+              // JS fallback
+              const rows = [];
+              for (const ap of absPaths) {
+                let meta = `id=${ap}`;
+                try {
+                  const st = await fsp.stat(ap);
+                  meta += `;mtime=${st.mtimeMs};size=${st.size}`;
+                } catch {}
+                rows.push(meta);
+              }
+              depsDigest = sha256(rows.join('|'));
+            }
+          }
+        } catch {}
+      }
       const key = sha256(
         contentLF +
           frontmatterNorm +
           featuresDigest +
           toolchainDigest +
+          depsDigest +
           (state.mode || '') +
           (state.salt || '') +
           norm.pathDigest
@@ -75,13 +134,17 @@ export default function fastmdCache(userOptions = {}) {
         }
         if (state.logLevel === 'verbose') logLine(`HIT  ${fmtMs(dt)}  ${norm.rel}`);
         if (state.logLevel === 'json')
-          logJSON('cache_hit', { rel: norm.rel, durationMs: dt, sizeBytes: got?.meta?.sizeBytes });
+          logJSON(
+            'cache_hit',
+            { rel: norm.rel, durationMs: dt, sizeBytes: got?.meta?.sizeBytes },
+            state.logger
+          );
         return got.map ? { code: got.code, map: got.map } : got.code;
       } catch {}
       // MISS: record intent to store after pipeline finishes in post phase
       state.pending.set(norm.rel, { key, startedAt: s0, rel: norm.rel });
       if (state.logLevel === 'verbose') logLine(`MISS(new)  --  ${norm.rel}`);
-      if (state.logLevel === 'json') logJSON('cache_miss', { rel: norm.rel });
+      if (state.logLevel === 'json') logJSON('cache_miss', { rel: norm.rel }, state.logger);
       return null;
     },
     buildStart() {
@@ -89,7 +152,7 @@ export default function fastmdCache(userOptions = {}) {
     },
     buildEnd() {
       if (state.logLevel === 'json') {
-        logSummaryJSON(state);
+        logSummaryJSON(state, state.logger);
         return;
       }
       if (state.logLevel !== 'silent') logSummary(state);
@@ -99,6 +162,7 @@ export default function fastmdCache(userOptions = {}) {
   const post = {
     name: 'fastmd-cache-post',
     enforce: 'post',
+    apply: 'build',
     async transform(code, id) {
       if (!shouldProcess(id, state)) return null;
       if (!state.enabled) return null;
@@ -134,12 +198,16 @@ export default function fastmdCache(userOptions = {}) {
       state.stats.misses++;
       state.stats.durations.push(duration);
       if (state.logLevel === 'json')
-        logJSON('cache_write', { rel: norm.rel, durationMs: duration, sizeBytes: meta.sizeBytes });
+        logJSON(
+          'cache_write',
+          { rel: norm.rel, durationMs: duration, sizeBytes: meta.sizeBytes },
+          state.logger
+        );
       return null; // do not alter code; just observe
     },
     buildEnd() {
       if (state.logLevel === 'json') {
-        logSummaryJSON(state);
+        logSummaryJSON(state, state.logger);
         return;
       }
       if (state.logLevel !== 'silent') logSummary(state);
@@ -164,14 +232,15 @@ export default function fastmdCache(userOptions = {}) {
  *  features:object;
  *  include?: string[];
  *  exclude?: string[];
- *  includeREs?: RegExp[];
- *  excludeREs?: RegExp[];
+ *  includeMatchers?: any[];
+ *  excludeMatchers?: any[];
  *  salt?: string;
  *  mode?: string;
  *  trackDependencies?: 'strict'|'loose';
  *  stats:{hits:number;misses:number;durations:number[];savedMs?:number};
  *  pending:Map<string, any>;
  *  toolchainDigest:string;
+ *  logger?: any;
  * }}
  */
 function createState(userOptions) {
@@ -179,8 +248,8 @@ function createState(userOptions) {
   const root = process.cwd();
 
   // Compose: options -> ENV (ENV highest)
-  const withOpts = pickKnownConfig(userOptions || {});
-  const withEnv = applyEnvOverrides(withOpts, env);
+  const withOpts = validateOptions(pickKnownConfig(userOptions || {}));
+  const withEnv = validateOptions(applyEnvOverrides(withOpts, env));
 
   const enabled = withEnv.enabled ?? true;
   const logLevel = withEnv.log ?? 'summary';
@@ -208,14 +277,15 @@ function createState(userOptions) {
     features,
     include,
     exclude,
-    includeREs: compileGlobs(include),
-    excludeREs: compileGlobs(exclude),
+    includeMatchers: compilePicomatch(include),
+    excludeMatchers: compilePicomatch(exclude),
     salt,
     mode: '',
     trackDependencies: withEnv.trackDependencies === 'loose' ? 'loose' : 'strict',
     stats: { hits: 0, misses: 0, durations: [], savedMs: 0 },
     pending: new Map(),
-    toolchainDigest: ''
+    toolchainDigest: '',
+    logger: undefined
   };
 }
 
@@ -238,13 +308,13 @@ function shouldProcess(id, _state) {
  */
 function isBypassed(rel, state) {
   // include: if provided, must match at least one pattern
-  if (state?.includeREs?.length) {
-    const ok = patternsMatch(rel, state.includeREs, state.include);
+  if (state?.includeMatchers?.length) {
+    const ok = state.includeMatchers.some((m) => safeMatch(m, rel, state.include));
     if (!ok) return true;
   }
   // exclude: if any pattern matches, bypass
-  if (state?.excludeREs?.length) {
-    if (patternsMatch(rel, state.excludeREs, state.exclude)) return true;
+  if (state?.excludeMatchers?.length) {
+    if (state.excludeMatchers.some((m) => safeMatch(m, rel, state.exclude))) return true;
   }
   return false;
 }
@@ -263,7 +333,7 @@ function normalizeId(id, root) {
   // Vite can give URLs like /@fs/abs-path or /@fs//abs-path (double slash)
   fp = fp.replace(/^\/@@?fs\/+/, '/');
   if (!path.isAbsolute(fp)) fp = path.resolve(root, fp);
-  const rel = path.posix.normalize(path.relative(root, fp).split(path.sep).join('/')).toLowerCase();
+  const rel = path.posix.normalize(slash(path.relative(root, fp))).toLowerCase();
   return { rel, pathDigest: rel };
 }
 
@@ -433,28 +503,33 @@ function logSummary(state) {
   );
 }
 
-function logJSON(evt, fields) {
+function logJSON(evt, fields, logger) {
   try {
     const row = { evt, ts: new Date().toISOString(), ...fields };
-    console.log(JSON.stringify(row));
+    if (logger) logger.info(row);
+    else console.log(JSON.stringify(row));
   } catch {}
 }
 
-function logSummaryJSON(state) {
+function logSummaryJSON(state, logger) {
   const total = state.stats.hits + state.stats.misses;
   const hitRate = total ? Math.round((state.stats.hits / total) * 100) : 0;
   const arr = state.stats.durations.slice().sort((a, b) => a - b);
   const p50 = arr.length ? arr[Math.floor(arr.length * 0.5)] : 0;
   const p95 = arr.length ? arr[Math.floor(arr.length * 0.95)] : 0;
-  logJSON('summary', {
-    total,
-    hits: state.stats.hits,
-    misses: state.stats.misses,
-    hitRate,
-    p50,
-    p95,
-    savedMs: state.stats.savedMs || 0
-  });
+  logJSON(
+    'summary',
+    {
+      total,
+      hits: state.stats.hits,
+      misses: state.stats.misses,
+      hitRate,
+      p50,
+      p95,
+      savedMs: state.stats.savedMs || 0
+    },
+    logger
+  );
 }
 
 /**
@@ -495,6 +570,82 @@ function applyEnvOverrides(base, env) {
       ? env.FASTMD_TRACK.toLowerCase()
       : undefined;
   return out;
+}
+
+// ------------------------
+// Validation and helpers (new)
+// ------------------------
+
+const OptsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    cacheDir: z.string().optional(),
+    include: z.union([z.string(), z.array(z.string())]).optional(),
+    exclude: z.union([z.string(), z.array(z.string())]).optional(),
+    salt: z.string().optional(),
+    log: z.enum(['silent', 'summary', 'verbose', 'json']).optional(),
+    features: z.record(z.unknown()).optional(),
+    trackDependencies: z.enum(['strict', 'loose']).optional()
+  })
+  .passthrough();
+
+/**
+ * Validate and normalize user/env options
+ * @param {any} o
+ */
+function validateOptions(o) {
+  try {
+    return OptsSchema.parse(o ?? {});
+  } catch (e) {
+    // Re-throw with clear prefix
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`[fastmd] invalid options: ${msg}`);
+  }
+}
+
+/**
+ * Compile glob patterns with picomatch
+ * @param {string[]|undefined} arr
+ */
+function compilePicomatch(arr) {
+  if (!arr || !arr.length) return [];
+  return arr.map((p) => picomatch(p, { nocase: true, dot: true }));
+}
+
+/**
+ * Safe matcher adapter for compiled picomatch functions; fallback to substring tokens
+ */
+function safeMatch(matcher, rel, raw) {
+  try {
+    if (typeof matcher === 'function') return !!matcher(rel);
+    if (matcher && typeof matcher.test === 'function') return matcher.test(rel);
+  } catch {}
+  if (raw?.length) {
+    const r = rel;
+    for (const pat of raw) {
+      const token = String(pat)
+        .toLowerCase()
+        .replace(/\\/g, '/')
+        .replace(/\*\*?/g, '')
+        .replace(/\?/g, '')
+        .replace(/\.+/g, '.');
+      if (token && r.includes(token)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Create a pino logger that writes JSON rows via console.log (test-friendly)
+ */
+function createJsonLogger() {
+  const dest = pino.destination({
+    write: (s) => {
+      const line = typeof s === 'string' ? s.trim() : String(s).trim();
+      if (line) console.log(line);
+    }
+  });
+  return pino({ level: 'info', base: null, timestamp: pino.stdTimeFunctions.isoTime }, dest);
 }
 
 // Expose internals for white-box tests (non-breaking for consumers)
@@ -590,60 +741,4 @@ function splitList(s) {
     .filter(Boolean);
 }
 
-/**
- * Compile glob patterns to RegExp objects (supports *, **, ? minimally).
- * @param {string[]|undefined} arr
- * @returns {RegExp[]}
- */
-function compileGlobs(arr) {
-  if (!arr || !arr.length) return [];
-  return arr.map((p) => globToRegExp(p));
-}
-
-/**
- * Return true if any regex matches OR a simple substring fallback matches.
- * The fallback helps with very broad patterns (e.g., any path containing '/draft/') without
- * depending on a full glob engine.
- * @param {string} rel
- * @param {RegExp[]} res
- * @param {string[]|undefined} raw
- */
-function patternsMatch(rel, res, raw) {
-  if (res.some((re) => re.test(rel))) return true;
-  if (raw?.length) {
-    const r = rel;
-    for (const pat of raw) {
-      const token = pat
-        .toLowerCase()
-        .replace(/\\/g, '/')
-        .replace(/\*\*?/g, '')
-        .replace(/\?/g, '')
-        .replace(/\.+/g, '.');
-      if (token && r.includes(token)) return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Convert a simple glob to a RegExp. Supports **, *, ? and escapes '.'
- * Pattern is applied to POSIX lowercased paths.
- * @param {string} pat
- */
-function globToRegExp(pat) {
-  // escape regex specials except * ? /
-  let s = pat.replace(/[.+^${}()|\[\]\\]/g, '\\$&');
-  // normalize backslashes to slashes
-  s = s.replace(/\\/g, '/');
-  // '**/' => '(?:.*/)?' (any leading path)
-  s = s.replace(/\*\*\//g, '(?:.*/)?');
-  // '/**' => '(?:/.*)?' (any trailing path)
-  s = s.replace(/\/\*\*/g, '(?:/.*)?');
-  // remaining '**' => '.*'
-  s = s.replace(/\*\*/g, '.*');
-  // '*' => '[^/]*'
-  s = s.replace(/\*/g, '[^/]*');
-  // '?' => '[^/]'
-  s = s.replace(/\?/g, '[^/]');
-  return new RegExp(`^${s}$`);
-}
+// remove legacy glob helpers (replaced by picomatch)

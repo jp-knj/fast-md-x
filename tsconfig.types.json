@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "allowJs": true,
+    "checkJs": true,
+    "outDir": "dist/types",
+    "skipLibCheck": true
+  },
+  "include": ["plugins/fastmd-cache/**/*.mjs"]
+}

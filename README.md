@@ -85,6 +85,9 @@ export default defineConfig({
 });
 ```
 
+Notes:
+- The cache plugin applies only during build (`apply: 'build'`). Dev/HMR is intentionally disabled for Phase 1.
+
 Keying inputs (stable key):
 - Content (BOM stripped, CR/LF normalized) + YAML frontmatter (stable JSON)
 - features digest + toolchain digest (node/astro/mdx/remark/rehype versions)
@@ -147,6 +150,15 @@ Tips for reproducibility:
 - Set `FASTMD_SALT` to identify the dataset (e.g., commit SHA).
 - Use `FASTMD_TRACK=strict|loose` to control invalidation sensitivity to toolchain versions.
 - Validate JSON logs with `schemas/fastmd-log.schema.json`.
+- For deeper measurements, consider `hyperfine` with 3-run x N-reps and parse NDJSON with `jq`.
+
+### Optional Native (Rust) — R0
+
+An optional native path (N-API, Rust via napi-rs) is being introduced behind a flag.
+
+- Enable: set `FASTMD_NATIVE=1` to allow the plugin to try a native module for dependency digesting.
+- Fallback: if the native module is not present or fails to load, the JS implementation is used.
+- Status: The bridge is present; the native crate will be added in a later step. No behavior change by default.
 
 ## Spec-kit (light) — 使い方
 
