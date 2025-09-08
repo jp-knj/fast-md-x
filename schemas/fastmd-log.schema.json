@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/fastmd-log.schema.json",
+  "title": "FastMD Log Event",
+  "type": "object",
+  "oneOf": [
+    {
+      "properties": {
+        "evt": { "const": "cache_miss" },
+        "ts": { "type": "string" },
+        "rel": { "type": "string" }
+      },
+      "required": ["evt", "ts", "rel"],
+      "additionalProperties": true
+    },
+    {
+      "properties": {
+        "evt": { "const": "cache_write" },
+        "ts": { "type": "string" },
+        "rel": { "type": "string" },
+        "durationMs": { "type": "number" },
+        "sizeBytes": { "type": "number" }
+      },
+      "required": ["evt", "ts", "rel", "durationMs", "sizeBytes"],
+      "additionalProperties": true
+    },
+    {
+      "properties": {
+        "evt": { "const": "cache_hit" },
+        "ts": { "type": "string" },
+        "rel": { "type": "string" },
+        "durationMs": { "type": "number" },
+        "sizeBytes": { "type": "number" }
+      },
+      "required": ["evt", "ts", "rel", "durationMs"],
+      "additionalProperties": true
+    },
+    {
+      "properties": {
+        "evt": { "const": "summary" },
+        "ts": { "type": "string" },
+        "total": { "type": "number" },
+        "hits": { "type": "number" },
+        "misses": { "type": "number" },
+        "hitRate": { "type": "number" },
+        "p50": { "type": "number" },
+        "p95": { "type": "number" },
+        "savedMs": { "type": "number" }
+      },
+      "required": ["evt", "ts", "total", "hits", "misses", "hitRate", "p50", "p95", "savedMs"],
+      "additionalProperties": true
+    }
+  ]
+}

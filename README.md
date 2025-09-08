@@ -55,12 +55,98 @@ Notes:
 - Type support for `bun:test` is provided by `bun-types` and a local `tests/env.d.ts` reference.
 - The fastmd cache plugin is validated by smoke tests under `tests/`.
 
+## ⚡ FastMD Cache (Vite plugin)
+
+This repo includes a Vite plugin that caches the final JS(+map) generated from Markdown/MDX transforms using a stable cache key.
+
+- Location: `plugins/fastmd-cache/index.mjs`
+- Wired by default in `astro.config.mjs` via `vite.plugins`.
+
+### Usage (Astro)
+
+`astro.config.mjs` (already set up here):
+
+```js
+import { defineConfig } from 'astro/config';
+import fastmdCache from './plugins/fastmd-cache/index.mjs';
+
+export default defineConfig({
+  vite: {
+    plugins: fastmdCache({
+      // Optional
+      include: ['**/*.md', '**/*.mdx'],
+      exclude: ['**/draft/**'],
+      cacheDir: '.cache/fastmd',
+      salt: process.env.FASTMD_SALT,
+      log: 'summary', // 'silent' | 'summary' | 'verbose' | 'json'
+      features: {}
+    })
+  }
+});
+```
+
+Keying inputs (stable key):
+- Content (BOM stripped, CR/LF normalized) + YAML frontmatter (stable JSON)
+- features digest + toolchain digest (node/astro/mdx/remark/rehype versions)
+- Path digest (normalized POSIX lowercased relative path)
+- Mode (development/production) + Salt
+
+Include/Exclude behavior:
+- If `include` is provided, only matching files participate in cache.
+- If `exclude` matches, caching is bypassed entirely for that file.
+- Globs support `**`, `*`, `?` minimally (internal helper; no extra deps).
+
+Helpers:
+- `clearCache(cacheDir: string)` — remove all cached entries
+- `warmup(entries: { id, code, js, map? }[], opts?: { cacheDir?, features? })` — pre-populate cache
+
+ENV overrides:
+- `FASTMD_DISABLE=1` — disable plugin even if enabled in options
+- `FASTMD_LOG=summary|verbose|json|silent`
+- `FASTMD_CACHE_DIR=/abs/or/relative/path`
+- `FASTMD_INCLUDE=**/*.md,**/*.mdx` (comma-separated)
+- `FASTMD_EXCLUDE=**/draft/**`
+- `FASTMD_SALT=project-or-build-identifier`
+
+Logging:
+- Summary (default): one line per build with totals and percentiles
+- JSON (`FASTMD_LOG=json`): NDJSON rows: `cache_miss`, `cache_write`, `cache_hit`, `summary`
+
+JSON schema: see `schemas/fastmd-log.schema.json` and the exported TypeScript union `FastMdLogEvent` in `plugins/fastmd-cache/index.d.ts`.
+
+Example JSON logging:
+
+```bash
+FASTMD_LOG=json pnpm build | node -e "process.stdin.on('data',b=>{try{const o=JSON.parse(b);if(o.evt==='summary')console.log(o)}catch{}})"
+```
+
 ## 🗄️ Cache Backend
 
 - This project uses cacache for all cache I/O. The previous FS layout (`.cache/fastmd/data`, `meta`) has been removed.
 - Default location: resolved with `find-cache-dir({ name: 'fastmd', create: true })`; falls back to `./.cache/fastmd` if unavailable. Override with `FASTMD_CACHE_DIR` or `cacheDir` option.
 - Clear cache: `rm -rf .cache/fastmd` (or use the exported helper `clearCache('.cache/fastmd')`).
 - The `store` option/ENV (`FASTMD_STORE`) and YAML key are no longer supported; cacache is always used.
+
+## 🔬 Bench (3-run protocol)
+
+`scripts/bench.sh` runs a simple MISS→HIT measurement loop. It assumes this repository is already wired with the plugin (it is), but real speedups depend on having many `.md/.mdx` pages in your project.
+
+```bash
+./scripts/bench.sh
+
+# optional: JSON logs for post-processing
+FASTMD_LOG=json ./scripts/bench.sh | tee bench.ndjson
+```
+
+What it does:
+- Run #1: clear cache → pnpm build (MISS+WRITE)
+- Run #2: pnpm build again (HIT)
+- Run #3: touch a sample file (if present) → mixed MISS/HIT
+
+Tips for reproducibility:
+- Set `FASTMD_SALT` to identify the dataset (e.g., commit SHA).
+- Use `FASTMD_TRACK=strict|loose` to control invalidation sensitivity to toolchain versions.
+- Validate JSON logs with `schemas/fastmd-log.schema.json`.
 
 ## Spec-kit (light) — 使い方
 

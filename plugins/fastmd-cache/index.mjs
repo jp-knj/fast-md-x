@@ -13,7 +13,7 @@ const stringify = require('json-stable-stringify');
  *
  * Behavior
  * - pre: computes a stable key and tries to read from the cacache store; on MISS,
- *         records intent for post to persist the final output.
+ *         records intent for post to write the final output.
  * - post: after the toolchain produces code (+ optional sourcemap), writes an entry
  *         to cacache keyed identically to pre.
  *
@@ -31,8 +31,12 @@ export default function fastmdCache(userOptions = {}) {
     enforce: 'pre',
     configResolved(cfg) {
       state.root = cfg.root || process.cwd();
+      // record bundler mode for keying (dev/prod)
+      try {
+        state.mode = cfg?.mode || state.mode || '';
+      } catch {}
       // compute toolchain digest once
-      state.toolchainDigest = getToolchainDigestSync();
+      state.toolchainDigest = getToolchainDigestSync(state.trackDependencies || 'strict');
     },
     async transform(code, id) {
       if (!shouldProcess(id, state)) return null;
@@ -40,13 +44,22 @@ export default function fastmdCache(userOptions = {}) {
 
       const s0 = now();
       const norm = normalizeId(id, state.root);
+      // include/exclude gating (bypass when not included or explicitly excluded)
+      if (isBypassed(norm.rel, state)) return null;
       const contentLF = normalizeNewlines(stripBOM(code));
       const fmParsed = matter(contentLF);
       const frontmatterNorm = stringify(fmParsed.data || {});
       const featuresDigest = digestJSON(sortedObject(state.features));
-      const toolchainDigest = state.toolchainDigest || getToolchainDigestSync();
+      const toolchainDigest =
+        state.toolchainDigest || getToolchainDigestSync(state.trackDependencies || 'strict');
       const key = sha256(
-        contentLF + frontmatterNorm + featuresDigest + toolchainDigest + norm.pathDigest
+        contentLF +
+          frontmatterNorm +
+          featuresDigest +
+          toolchainDigest +
+          (state.mode || '') +
+          (state.salt || '') +
+          norm.pathDigest
       );
 
       // Try cacache
@@ -55,18 +68,30 @@ export default function fastmdCache(userOptions = {}) {
         const got = JSON.parse(res.data.toString('utf8'));
         state.stats.hits++;
         const dt = now() - s0;
+        // estimated saved time (prior MISS duration)
+        if (got?.meta?.durationMs != null) {
+          const prior = Number(got.meta.durationMs) || 0;
+          state.stats.savedMs = (state.stats.savedMs || 0) + (prior > 0 ? prior : 0);
+        }
         if (state.logLevel === 'verbose') logLine(`HIT  ${fmtMs(dt)}  ${norm.rel}`);
+        if (state.logLevel === 'json')
+          logJSON('cache_hit', { rel: norm.rel, durationMs: dt, sizeBytes: got?.meta?.sizeBytes });
         return got.map ? { code: got.code, map: got.map } : got.code;
       } catch {}
       // MISS: record intent to store after pipeline finishes in post phase
       state.pending.set(norm.rel, { key, startedAt: s0, rel: norm.rel });
       if (state.logLevel === 'verbose') logLine(`MISS(new)  --  ${norm.rel}`);
+      if (state.logLevel === 'json') logJSON('cache_miss', { rel: norm.rel });
       return null;
     },
     buildStart() {
-      state.stats = { hits: 0, misses: 0, durations: [] };
+      state.stats = { hits: 0, misses: 0, durations: [], savedMs: 0 };
     },
     buildEnd() {
+      if (state.logLevel === 'json') {
+        logSummaryJSON(state);
+        return;
+      }
       if (state.logLevel !== 'silent') logSummary(state);
     }
   };
@@ -78,6 +103,7 @@ export default function fastmdCache(userOptions = {}) {
       if (!shouldProcess(id, state)) return null;
       if (!state.enabled) return null;
       const norm = normalizeId(id, state.root);
+      if (isBypassed(norm.rel, state)) return null;
       const pending = state.pending.get(norm.rel);
       if (!pending) return null;
 
@@ -96,7 +122,8 @@ export default function fastmdCache(userOptions = {}) {
       const meta = {
         version: '1',
         createdAt: new Date().toISOString(),
-        toolchainDigest: state.toolchainDigest || getToolchainDigestSync(),
+        toolchainDigest:
+          state.toolchainDigest || getToolchainDigestSync(state.trackDependencies || 'strict'),
         featuresDigest: digestJSON(sortedObject(state.features)),
         sizeBytes: Buffer.byteLength(code, 'utf8'),
         durationMs: duration
@@ -106,9 +133,15 @@ export default function fastmdCache(userOptions = {}) {
       state.pending.delete(norm.rel);
       state.stats.misses++;
       state.stats.durations.push(duration);
+      if (state.logLevel === 'json')
+        logJSON('cache_write', { rel: norm.rel, durationMs: duration, sizeBytes: meta.sizeBytes });
       return null; // do not alter code; just observe
     },
     buildEnd() {
+      if (state.logLevel === 'json') {
+        logSummaryJSON(state);
+        return;
+      }
       if (state.logLevel !== 'silent') logSummary(state);
     }
   };
@@ -123,7 +156,23 @@ export default function fastmdCache(userOptions = {}) {
  * Build internal, resolved state for a plugin instance.
  * Honors environment variables first, then user options.
  * @param {object} userOptions
- * @returns {{root:string, enabled:boolean, logLevel:string, cacheDir:string, features:object, stats:{hits:number,misses:number,durations:number[]}, pending:Map<string, any>, toolchainDigest:string}}
+ * @returns {{
+ *  root:string;
+ *  enabled:boolean;
+ *  logLevel:string;
+ *  cacheDir:string;
+ *  features:object;
+ *  include?: string[];
+ *  exclude?: string[];
+ *  includeREs?: RegExp[];
+ *  excludeREs?: RegExp[];
+ *  salt?: string;
+ *  mode?: string;
+ *  trackDependencies?: 'strict'|'loose';
+ *  stats:{hits:number;misses:number;durations:number[];savedMs?:number};
+ *  pending:Map<string, any>;
+ *  toolchainDigest:string;
+ * }}
  */
 function createState(userOptions) {
   const env = process.env;
@@ -148,13 +197,23 @@ function createState(userOptions) {
     }
   }
   const features = withEnv.features ?? {};
+  const include = normGlobList(withEnv.include);
+  const exclude = normGlobList(withEnv.exclude);
+  const salt = typeof withEnv.salt === 'string' ? withEnv.salt : undefined;
   return {
     root,
     enabled,
     logLevel,
     cacheDir,
     features,
-    stats: { hits: 0, misses: 0, durations: [] },
+    include,
+    exclude,
+    includeREs: compileGlobs(include),
+    excludeREs: compileGlobs(exclude),
+    salt,
+    mode: '',
+    trackDependencies: withEnv.trackDependencies === 'loose' ? 'loose' : 'strict',
+    stats: { hits: 0, misses: 0, durations: [], savedMs: 0 },
     pending: new Map(),
     toolchainDigest: ''
   };
@@ -170,6 +229,24 @@ function shouldProcess(id, _state) {
   if (!fp) return false;
   const ext = fp.toLowerCase().endsWith('.md') || fp.toLowerCase().endsWith('.mdx');
   return !!ext;
+}
+
+/**
+ * Return true if the path should be bypassed due to include/exclude.
+ * @param {string} rel posix, lowercased relative path
+ * @param {any} state
+ */
+function isBypassed(rel, state) {
+  // include: if provided, must match at least one pattern
+  if (state?.includeREs?.length) {
+    const ok = patternsMatch(rel, state.includeREs, state.include);
+    if (!ok) return true;
+  }
+  // exclude: if any pattern matches, bypass
+  if (state?.excludeREs?.length) {
+    if (patternsMatch(rel, state.excludeREs, state.exclude)) return true;
+  }
+  return false;
 }
 
 /**
@@ -269,12 +346,16 @@ function sha256(s) {
  * Build a digest string from versions of Node and relevant packages (sync).
  * @returns {string}
  */
-function getToolchainDigestSync() {
+function getToolchainDigestSync(mode = 'strict') {
   const parts = [];
-  parts.push(`node=${process.versions.node}`);
+  const nodeVer = process.versions.node;
+  parts.push(`node=${mode === 'loose' ? nodeVer.split('.')[0] : nodeVer}`);
   for (const name of ['vite', 'astro', '@mdx-js/mdx', 'remark', 'rehype', 'expressive-code']) {
     const ver = safePkgVersion(name);
-    if (ver) parts.push(`${name}=${ver}`);
+    if (ver) {
+      const v = String(ver);
+      parts.push(`${name}=${mode === 'loose' ? v.split('.')[0] : v}`);
+    }
   }
   return parts.join('|');
 }
@@ -283,8 +364,8 @@ function getToolchainDigestSync() {
  * Promise wrapper for compatibility with existing callers/tests.
  * @returns {Promise<string>}
  */
-async function getToolchainDigest() {
-  return getToolchainDigestSync();
+async function getToolchainDigest(mode = 'strict') {
+  return getToolchainDigestSync(mode);
 }
 
 /**
@@ -337,7 +418,7 @@ function logLine(s) {
 
 /**
  * Log a summary line of cache statistics.
- * @param {{stats:{hits:number,misses:number,durations:number[]}}} state
+ * @param {{stats:{hits:number,misses:number,durations:number[],savedMs?:number}}} state
  */
 function logSummary(state) {
   const total = state.stats.hits + state.stats.misses;
@@ -348,8 +429,32 @@ function logSummary(state) {
   logLine(
     `summary total=${total} hits=${state.stats.hits} misses=${state.stats.misses} hitRate=${hitRate}% p50=${fmtMs(
       p50
-    )} p95=${fmtMs(p95)}`
+    )} p95=${fmtMs(p95)} savedMs=${fmtMs(state.stats.savedMs || 0)}`
   );
+}
+
+function logJSON(evt, fields) {
+  try {
+    const row = { evt, ts: new Date().toISOString(), ...fields };
+    console.log(JSON.stringify(row));
+  } catch {}
+}
+
+function logSummaryJSON(state) {
+  const total = state.stats.hits + state.stats.misses;
+  const hitRate = total ? Math.round((state.stats.hits / total) * 100) : 0;
+  const arr = state.stats.durations.slice().sort((a, b) => a - b);
+  const p50 = arr.length ? arr[Math.floor(arr.length * 0.5)] : 0;
+  const p95 = arr.length ? arr[Math.floor(arr.length * 0.95)] : 0;
+  logJSON('summary', {
+    total,
+    hits: state.stats.hits,
+    misses: state.stats.misses,
+    hitRate,
+    p50,
+    p95,
+    savedMs: state.stats.savedMs || 0
+  });
 }
 
 /**
@@ -362,9 +467,12 @@ function pickKnownConfig(src) {
   const out = {};
   if ('enabled' in o) out.enabled = o.enabled;
   if ('cacheDir' in o) out.cacheDir = o.cacheDir;
-  if ('persist' in o) out.persist = o.persist;
   if ('log' in o) out.log = o.log;
   if ('features' in o) out.features = o.features;
+  if ('include' in o) out.include = o.include;
+  if ('exclude' in o) out.exclude = o.exclude;
+  if ('salt' in o) out.salt = o.salt;
+  if ('trackDependencies' in o) out.trackDependencies = o.trackDependencies;
   return out;
 }
 
@@ -379,7 +487,13 @@ function applyEnvOverrides(base, env) {
   if (env.FASTMD_DISABLE != null) out.enabled = !truthy(env.FASTMD_DISABLE);
   if (env.FASTMD_LOG) out.log = env.FASTMD_LOG;
   if (env.FASTMD_CACHE_DIR) out.cacheDir = env.FASTMD_CACHE_DIR;
-  if (env.FASTMD_PERSIST != null) out.persist = truthy(env.FASTMD_PERSIST);
+  if (env.FASTMD_INCLUDE) out.include = splitList(env.FASTMD_INCLUDE);
+  if (env.FASTMD_EXCLUDE) out.exclude = splitList(env.FASTMD_EXCLUDE);
+  if (env.FASTMD_SALT) out.salt = env.FASTMD_SALT;
+  if (env.FASTMD_TRACK)
+    out.trackDependencies = /^(loose|strict)$/i.test(env.FASTMD_TRACK)
+      ? env.FASTMD_TRACK.toLowerCase()
+      : undefined;
   return out;
 }
 
@@ -387,6 +501,7 @@ function applyEnvOverrides(base, env) {
 export const __internals = {
   createState,
   shouldProcess,
+  isBypassed,
   normalizeId,
   stripBOM,
   normalizeNewlines,
@@ -448,4 +563,87 @@ export async function warmup(entries, opts = {}) {
     const payload = JSON.stringify({ code: e.js, map: e.map, meta });
     await cacache.put(base, key, Buffer.from(payload));
   }
+}
+
+// ------------------------
+// Glob helpers
+// ------------------------
+
+/**
+ * Normalize a string or string[] into string[] or undefined.
+ * @param {unknown} v
+ * @returns {string[]|undefined}
+ */
+function normGlobList(v) {
+  if (typeof v === 'string') return [v];
+  if (Array.isArray(v)) return v.filter((s) => typeof s === 'string');
+  return undefined;
+}
+
+/**
+ * Split env list by comma.
+ */
+function splitList(s) {
+  return String(s)
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Compile glob patterns to RegExp objects (supports *, **, ? minimally).
+ * @param {string[]|undefined} arr
+ * @returns {RegExp[]}
+ */
+function compileGlobs(arr) {
+  if (!arr || !arr.length) return [];
+  return arr.map((p) => globToRegExp(p));
+}
+
+/**
+ * Return true if any regex matches OR a simple substring fallback matches.
+ * The fallback helps with very broad patterns (e.g., any path containing '/draft/') without
+ * depending on a full glob engine.
+ * @param {string} rel
+ * @param {RegExp[]} res
+ * @param {string[]|undefined} raw
+ */
+function patternsMatch(rel, res, raw) {
+  if (res.some((re) => re.test(rel))) return true;
+  if (raw?.length) {
+    const r = rel;
+    for (const pat of raw) {
+      const token = pat
+        .toLowerCase()
+        .replace(/\\/g, '/')
+        .replace(/\*\*?/g, '')
+        .replace(/\?/g, '')
+        .replace(/\.+/g, '.');
+      if (token && r.includes(token)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Convert a simple glob to a RegExp. Supports **, *, ? and escapes '.'
+ * Pattern is applied to POSIX lowercased paths.
+ * @param {string} pat
+ */
+function globToRegExp(pat) {
+  // escape regex specials except * ? /
+  let s = pat.replace(/[.+^${}()|\[\]\\]/g, '\\$&');
+  // normalize backslashes to slashes
+  s = s.replace(/\\/g, '/');
+  // '**/' => '(?:.*/)?' (any leading path)
+  s = s.replace(/\*\*\//g, '(?:.*/)?');
+  // '/**' => '(?:/.*)?' (any trailing path)
+  s = s.replace(/\/\*\*/g, '(?:/.*)?');
+  // remaining '**' => '.*'
+  s = s.replace(/\*\*/g, '.*');
+  // '*' => '[^/]*'
+  s = s.replace(/\*/g, '[^/]*');
+  // '?' => '[^/]'
+  s = s.replace(/\?/g, '[^/]');
+  return new RegExp(`^${s}$`);
 }
