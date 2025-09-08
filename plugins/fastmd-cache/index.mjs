@@ -95,17 +95,17 @@ export default function fastmdCache(userOptions = {}) {
             if (nativeDigest) {
               depsDigest = nativeDigest;
             } else {
-              // JS fallback
-              const rows = [];
+              // JS fallback: path|size|mtimeMs\n (canonical, matches Rust)
+              const lines = [];
               for (const ap of absPaths) {
-                let meta = `id=${ap}`;
                 try {
                   const st = await fsp.stat(ap);
-                  meta += `;mtime=${st.mtimeMs};size=${st.size}`;
-                } catch {}
-                rows.push(meta);
+                  lines.push(`${ap}|${st.size}|${st.mtimeMs}`);
+                } catch {
+                  lines.push(`${ap}|0|0`);
+                }
               }
-              depsDigest = sha256(rows.join('|'));
+              depsDigest = sha256(lines.join('\n') + (lines.length ? '\n' : ''));
             }
           }
         } catch {}
