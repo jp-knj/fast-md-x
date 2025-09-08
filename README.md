@@ -160,6 +160,17 @@ An optional native path (N-API, Rust via napi-rs) is being introduced behind a f
 - Fallback: if the native module is not present or fails to load, the JS implementation is used.
 - Status: The bridge is present; the native crate will be added in a later step. No behavior change by default.
 
+Local smoke test (optional):
+- Build a local `index.node` under `native/fastmd-native/` using your preferred napi-rs workflow.
+- Then compare JS vs native digests for a set of files:
+
+```bash
+scripts/native-smoke.sh path/to/a.md path/to/b.mdx
+# or
+node scripts/print-digest.mjs path/to/a.md path/to/b.mdx           # JS digest only
+FASTMD_NATIVE=1 node scripts/print-digest.mjs a.md b.mdx --native  # JS vs Native, compare
+```
+
 ## Spec-kit (light) — 使い方
 
 1. 雛形作成: `scripts/create-new-feature.sh <ID> <slug>` 例: `scripts/create-new-feature.sh 001 sample`
