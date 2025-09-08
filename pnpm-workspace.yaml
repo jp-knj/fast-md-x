@@ -1,3 +1,6 @@
+packages:
+  - '.'
+  - 'native/**'
 ignoredBuiltDependencies:
   - '@biomejs/biome'
   - esbuild
