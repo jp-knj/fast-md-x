@@ -31,7 +31,7 @@ async function digestJs(paths) {
 
 async function tryNative(paths) {
   try {
-    const { loadFastmdNative } = await import('../plugins/fastmd-cache/native-bridge.mjs');
+    const { loadFastmdNative } = await import('../packages/fastmd-cache/native-bridge.mjs');
     const mod = loadFastmdNative();
     if (mod && typeof mod.deps_digest === 'function') return mod.deps_digest(paths);
   } catch {}

@@ -1,7 +1,7 @@
 # Plan: Rust Core R0 — Native bridge with safe fallback
 
 ## Steps
-1) Add JS bridge `plugins/fastmd-cache/native-bridge.mjs`
+1) Add JS bridge `packages/fastmd-cache/native-bridge.mjs`
    - `loadFastmdNative()` — env-guarded loader (FASTMD_NATIVE)
    - Expose `depsDigestNative(paths)` or return null
 2) Wire bridge in plugin (strict deps digest path)

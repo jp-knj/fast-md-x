@@ -5,7 +5,7 @@ These guidelines are specific to this Astro project and its experimental Markdow
 ## Project Structure & Module Organization
 - `src/pages/`: Astro pages (`.astro`, `.md`, `.mdx`).
 - `public/`: Static assets served as‑is.
-- `plugins/fastmd-cache/`: Vite plugin (`index.mjs`) implementing whole‑output caching for `.md/.mdx`.
+- `packages/fastmd-cache/`: Vite plugin (`index.mjs`) implementing whole‑output caching for `.md/.mdx`.
 - `astro.config.mjs`: Registers the plugin via `vite.plugins`.
 - `fastmd.config.yml` (optional): Plugin config; see `fastmd.config.sample.yml`.
 - `.cache/fastmd/`: Cache storage (ignored by Git).

@@ -8,7 +8,7 @@ import { describe, expect, test } from 'bun:test';
 // gray-matter is used internally but not exported, so we import it directly
 import matter from 'gray-matter';
 // @ts-ignore - ESM import
-import { __internals } from '../../plugins/fastmd-cache/index.mjs';
+import { __internals } from '../../packages/fastmd-cache/index.mjs';
 import { MarkdownBuilder } from '../_utils';
 
 describe('Frontmatter Parsing', () => {

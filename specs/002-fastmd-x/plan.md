@@ -18,7 +18,7 @@ Constraints: キャッシュ破損時は MISS 扱いで例外を投げない（�
 
 ## Constitution Check
 Simplicity:
-- Projects: 1（app+lib 同居、プラグインは `plugins/fastmd-cache`）
+- Projects: 1（app+lib 同居、プラグインは `packages/fastmd-cache`）
 - フレームワーク直使用（Vite/Astro）。余剰なラッパは作らない。
 
 Architecture:

@@ -8,5 +8,9 @@
     "noUnusedParameters": true,
     "skipLibCheck": true
   },
-  "include": ["plugins/**/*.mjs", "tests/**/*.ts"]
+  "include": ["plugins/**/*.mjs", "tests/**/*.ts", "packages/**/*.mjs"],
+  "references": [
+    { "path": "./packages/fastmd-shared" },
+    { "path": "./packages/fastmd-plugin-transform" }
+  ]
 }

@@ -12,7 +12,7 @@
  * - The plugin under test is ESM (`index.mjs`).
  */
 import { describe, expect, test } from 'bun:test';
-import fastmdCache from '../../plugins/fastmd-cache/index.mjs';
+import fastmdCache from '../../packages/fastmd-cache/index.mjs';
 
 /**
  * Create plugin phases with default options and assert basic shape.

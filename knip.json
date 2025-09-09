@@ -1,6 +1,22 @@
 {
   "$schema": "https://unpkg.com/knip@5.63.1/schema.json",
-  "entry": ["plugins/fastmd-cache/index.mjs"],
-  "project": ["plugins/**/*.mjs", "tests/**/*.ts"],
-  "ignore": ["dist/**", ".cache/**", ".astro/**", "public/**", "node_modules/**"]
+  "entry": [
+    "packages/fastmd-cache/index.mjs",
+    "packages/fastmd-shared/src/index.ts",
+    "packages/fastmd-plugin-transform/src/index.ts"
+  ],
+  "project": ["plugins/**/*.mjs", "tests/**/*.ts", "packages/**/*.ts", "packages/**/*.mjs"],
+  "ignore": [
+    "dist/**",
+    ".cache/**",
+    ".astro/**",
+    "public/**",
+    "node_modules/**",
+    "packages/*/dist/**",
+    "engines/sidecar/target/**",
+    "native/*/pkg/**"
+  ],
+  "workspaces": {
+    "packages/*": {}
+  }
 }

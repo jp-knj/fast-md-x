@@ -6,7 +6,7 @@ import { describe, expect, test } from 'bun:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
-import fastmdCache from '../../plugins/fastmd-cache/index.mjs';
+import fastmdCache from '../../packages/fastmd-cache/index.mjs';
 import { type TransformLike, callTransform } from '../_utils';
 
 async function mkTmp() {
@@ -63,7 +63,7 @@ describe('fastmd-cache: NDJSON schema (Ajv, strict)', () => {
       if (!ok) {
         // For debugging: attach readable error message
         const msg = ajv.errorsText(validate.errors, { separator: '\n' });
-        throw new Error('schema validation failed:\n' + msg + '\nrow=' + JSON.stringify(r));
+        throw new Error(`schema validation failed:\n${msg}\nrow=${JSON.stringify(r)}`);
       }
       seen.add((r as any).evt);
     }

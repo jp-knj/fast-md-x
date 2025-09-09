@@ -5,7 +5,7 @@
 import { describe, expect, test } from 'bun:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import fastmdCache, { clearCache, warmup } from '../../plugins/fastmd-cache/index.mjs';
+import fastmdCache, { clearCache, warmup } from '../../packages/fastmd-cache/index.mjs';
 import { type TransformLike, callTransform, createTempDir } from '../_utils';
 
 /**

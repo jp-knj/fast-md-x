@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const { performance } = require('perf_hooks');
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { performance } = require('node:perf_hooks');
 
 // JS implementations
 function stripBOM(s) {
@@ -108,10 +108,7 @@ function generateMDContent(sizeKB) {
 
   // Add BOM and mixed line endings for normalization test
   const content = lines.join('\n');
-  return (
-    '\uFEFF' +
-    content.replace(/\n/g, () => (Math.random() > 0.5 ? '\r\n' : Math.random() > 0.5 ? '\r' : '\n'))
-  );
+  return `\uFEFF${content.replace(/\n/g, () => (Math.random() > 0.5 ? '\r\n' : Math.random() > 0.5 ? '\r' : '\n'))}`;
 }
 
 function generateMDXContent(sizeKB) {
@@ -147,7 +144,7 @@ function generateMDXContent(sizeKB) {
     currentSize = lines.join('\n').length;
   }
 
-  return '\uFEFF' + lines.join('\r\n'); // Use CRLF for MDX
+  return `\uFEFF${lines.join('\r\n')}`; // Use CRLF for MDX
 }
 
 console.log('='.repeat(70));
@@ -178,8 +175,8 @@ for (const sizeKB of mdSizes) {
 
   mdNormalizeResults.push({
     size: `${sizeKB}KB MD`,
-    js: jsResult.avgTime.toFixed(3) + 'ms',
-    wasm: wasmResult.avgTime.toFixed(3) + 'ms',
+    js: `${jsResult.avgTime.toFixed(3)}ms`,
+    wasm: `${wasmResult.avgTime.toFixed(3)}ms`,
     speedup: faster ? `+${speedup}%` : `${speedup}%`,
     winner: faster ? '🚀 WASM' : 'JS'
   });
@@ -211,8 +208,8 @@ for (const sizeKB of mdxSizes) {
 
   mdxNormalizeResults.push({
     size: `${sizeKB}KB MDX`,
-    js: jsResult.avgTime.toFixed(3) + 'ms',
-    wasm: wasmResult.avgTime.toFixed(3) + 'ms',
+    js: `${jsResult.avgTime.toFixed(3)}ms`,
+    wasm: `${wasmResult.avgTime.toFixed(3)}ms`,
     speedup: faster ? `+${speedup}%` : `${speedup}%`,
     winner: faster ? '🚀 WASM' : 'JS'
   });
@@ -264,8 +261,8 @@ for (const count of fileCounts) {
 
   digestResults.push({
     files: `${count} (.md/.mdx)`,
-    js: jsResult.avgTime.toFixed(3) + 'ms',
-    wasm: wasmResult.avgTime.toFixed(3) + 'ms',
+    js: `${jsResult.avgTime.toFixed(3)}ms`,
+    wasm: `${wasmResult.avgTime.toFixed(3)}ms`,
     speedup: faster ? `+${speedup}%` : `${speedup}%`,
     winner: faster ? '🚀 WASM' : 'JS'
   });
@@ -274,7 +271,7 @@ for (const count of fileCounts) {
 console.table(digestResults);
 
 // Summary
-console.log('\n' + '='.repeat(70));
+console.log(`\n${'='.repeat(70)}`);
 console.log('📊 Performance Summary:');
 console.log('='.repeat(70));
 
@@ -282,7 +279,7 @@ const allResults = [...mdNormalizeResults, ...mdxNormalizeResults, ...digestResu
 const totalWasmWins = allResults.filter((r) => r.winner === '🚀 WASM').length;
 const totalTests = allResults.length;
 
-console.log(`\nWASM Performance:`);
+console.log('\nWASM Performance:');
 console.log(`  • Won: ${totalWasmWins}/${totalTests} benchmarks`);
 
 // Calculate average speedup for WASM wins
@@ -294,7 +291,7 @@ if (wasmWins.length > 0) {
 }
 
 // Show performance by category
-console.log(`\nPerformance by file type:`);
+console.log('\nPerformance by file type:');
 const mdWins = mdNormalizeResults.filter((r) => r.winner === '🚀 WASM').length;
 const mdxWins = mdxNormalizeResults.filter((r) => r.winner === '🚀 WASM').length;
 const digestWins = digestResults.filter((r) => r.winner === '🚀 WASM').length;

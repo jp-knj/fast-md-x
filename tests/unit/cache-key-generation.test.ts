@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from 'bun:test';
 // @ts-ignore - ESM import
-import { __internals } from '../../plugins/fastmd-cache/index.mjs';
+import { __internals } from '../../packages/fastmd-cache/index.mjs';
 import { MarkdownBuilder, createMockPluginConfig } from '../_utils';
 
 describe('Cache Key Generation', () => {

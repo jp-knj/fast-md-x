@@ -5,7 +5,7 @@
 import { describe, expect, test } from 'bun:test';
 // removed unused fs/os imports
 import path from 'node:path';
-import fastmdCache, { __internals } from '../../plugins/fastmd-cache/index.mjs';
+import fastmdCache, { __internals } from '../../packages/fastmd-cache/index.mjs';
 
 // tmpdir helper removed (no longer used)
 

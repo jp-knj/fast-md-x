@@ -23,6 +23,16 @@
     }
   },
   "files": {
-    "ignore": ["dist", "node_modules", ".cache", ".astro", "public", "**/*.astro"]
+    "ignore": [
+      "dist",
+      "node_modules",
+      ".cache",
+      ".astro",
+      "public",
+      "**/*.astro",
+      "packages/*/dist",
+      "engines/sidecar/target",
+      "native/*/pkg"
+    ]
   }
 }

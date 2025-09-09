@@ -1,7 +1,7 @@
 import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 // Import the fastmd-cache plugin from the local workspace
-import fastmdCache from '../../plugins/fastmd-cache/index.mjs';
+import fastmdCache from '../../packages/fastmd-cache/index.mjs';
 
 export default defineConfig({
   plugins: [
