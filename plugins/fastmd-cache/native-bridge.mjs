@@ -14,7 +14,11 @@ export function loadFastmdNative() {
   for (const id of candidates) {
     try {
       const mod = require(id);
-      if (mod && typeof mod.deps_digest === 'function') return mod;
+      if (
+        mod &&
+        (typeof mod.deps_digest === 'function' || typeof mod.normalize_content === 'function')
+      )
+        return mod;
     } catch {}
   }
   return null;
@@ -30,6 +34,20 @@ export function depsDigestNative(paths, native) {
     const mod = native ?? loadFastmdNative();
     if (mod && typeof mod.deps_digest === 'function') {
       return mod.deps_digest(paths);
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Try native content normalization if available; otherwise return null
+ * Contract: normalize_content(s:string) -> string
+ */
+export function normalizeContentNative(text, native) {
+  try {
+    const mod = native ?? loadFastmdNative();
+    if (mod && typeof mod.normalize_content === 'function') {
+      return String(mod.normalize_content(String(text)));
     }
   } catch {}
   return null;

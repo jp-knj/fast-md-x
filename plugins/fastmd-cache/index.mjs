@@ -8,7 +8,7 @@ import picomatch from 'picomatch';
 import pino from 'pino';
 import slash from 'slash';
 import { z } from 'zod';
-import { depsDigestNative, loadFastmdNative } from './native-bridge.mjs';
+import { depsDigestNative, loadFastmdNative, normalizeContentNative } from './native-bridge.mjs';
 
 const require = createRequire(import.meta.url);
 const matter = require('gray-matter');
@@ -47,6 +47,10 @@ export default function fastmdCache(userOptions = {}) {
       if (state.logLevel === 'json' && !state.logger) {
         state.logger = createJsonLogger();
       }
+      // load native once if enabled
+      try {
+        state.native = loadFastmdNative();
+      } catch {}
     },
     async transform(code, id) {
       if (!shouldProcess(id, state)) return null;
@@ -56,7 +60,8 @@ export default function fastmdCache(userOptions = {}) {
       const norm = normalizeId(id, state.root);
       // include/exclude gating (bypass when not included or explicitly excluded)
       if (isBypassed(norm.rel, state)) return null;
-      const contentLF = normalizeNewlines(stripBOM(code));
+      let contentLF = normalizeContentNative(code);
+      if (contentLF == null) contentLF = normalizeNewlines(stripBOM(code));
       const fmParsed = matter(contentLF);
       const frontmatterNorm = stringify(fmParsed.data || {});
       const featuresDigest = digestJSON(sortedObject(state.features));
@@ -241,6 +246,7 @@ export default function fastmdCache(userOptions = {}) {
  *  pending:Map<string, any>;
  *  toolchainDigest:string;
  *  logger?: any;
+ *  native?: any;
  * }}
  */
 function createState(userOptions) {
@@ -285,7 +291,8 @@ function createState(userOptions) {
     stats: { hits: 0, misses: 0, durations: [], savedMs: 0 },
     pending: new Map(),
     toolchainDigest: '',
-    logger: undefined
+    logger: undefined,
+    native: undefined
   };
 }
 
