@@ -51,7 +51,7 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
     const stub = m.loadFastmdNative();
     expect(stub).toBeNull();
     // depsDigestNative returns null when not enabled
-    const res = m.depsDigestNative(['x'], undefined as unknown as any);
+    const res = m.depsDigestNative(['x'], undefined as unknown as unknown);
     expect(res).toBeNull();
     process.env = prevEnv;
   });
@@ -66,7 +66,7 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
     const stub = m.loadFastmdNative();
     // Should be null since it doesn't expose deps_digest
     expect(stub).toBeNull();
-    const res = m.depsDigestNative(['x'], undefined as unknown as any);
+    const res = m.depsDigestNative(['x'], undefined as unknown as unknown);
     expect(res).toBeNull();
     process.env = prevEnv;
   });
@@ -81,7 +81,7 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
     process.env.FASTMD_NATIVE = '1';
     process.env.FASTMD_NATIVE_MODULE = modPath;
     const m = await import('../../plugins/fastmd-cache/native-bridge.mjs');
-    const res = m.depsDigestNative(['y'], undefined as unknown as any);
+    const res = m.depsDigestNative(['y'], undefined as unknown as unknown);
     expect(res).toBeNull();
     process.env = prevEnv;
   });

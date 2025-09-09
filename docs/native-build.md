@@ -52,3 +52,16 @@ scripts/native-smoke.sh path/to/a.md path/to/b.mdx
 - 現状 prebuild 配布は未対応（R1 の範囲外）。CI/テストは常に JS 経路が基準です
 - 将来 R2 として prebuild（actions + matrix）を導入予定
 
+## Rust 側テスト（雛形）
+
+ネイティブ crate 単体のテストは Cargo で実行できます（ローカル限定）。
+
+```bash
+cd native/fastmd-native
+cargo test
+```
+
+内容:
+- 既存/欠損ファイルを混在させたときのダイジェスト（`path|size|mtimeMs\n`連結→sha256）
+- 入力順序に依らず同一ダイジェスト（安定ソート）
+
