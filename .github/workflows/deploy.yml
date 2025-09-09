@@ -78,6 +78,36 @@ jobs:
         with:
           path: ./dist
 
+  native-test:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install pnpm
+        run: npm install -g pnpm@10.13.1
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Install dependencies (pnpm)
+        run: pnpm install --frozen-lockfile
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust unit tests (native crate)
+        run: pnpm native:test
+      - name: Build native addon (napi)
+        run: pnpm native:build
+      - name: JS tests with native path
+        run: pnpm test:native
+
   deploy:
     needs: build
     runs-on: ubuntu-latest

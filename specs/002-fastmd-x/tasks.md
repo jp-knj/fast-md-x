@@ -7,41 +7,41 @@ Format: `[ID] [P?] Description` — [P] = parallel-safe（異なるファイル�
 
 ## Phase 3.1: Setup
 - [ ] T001 Confirm working branch `002-fastmd-x` and reference spec/plan links in PR
-- [ ] T002 [P] Add JSDoc for public API (factory, `clearCache`, `warmup`) in `plugins/fastmd-cache/index.mjs`
+- [x] T002 [P] Add JSDoc for public API (factory, `clearCache`, `warmup`) in `plugins/fastmd-cache/index.mjs`
 
 ## Phase 3.2: Tests First (must fail before 3.3)
-- [ ] T101 include/exclude globs are honored
+- [x] T101 include/exclude globs are honored
   - File: `tests/include-exclude.test.ts`
   - Cases: `include: "**/*.mdx"` excludes `.md`; `exclude: "**/draft/**"` bypasses cache entirely
-- [ ] T102 salt contributes to key (different salts ≠ HIT)
+- [x] T102 salt contributes to key (different salts ≠ HIT)
   - File: `tests/salt-keying.test.ts`
-- [ ] T103 bundler mode (development/production) contributes to key
+- [x] T103 bundler mode (development/production) contributes to key
   - File: `tests/mode-keying.test.ts`
   - Simulate `configResolved` with different `mode`; ensure HIT 交差しない
-- [ ] T104 JSON logging structure is stable (cache_hit/miss/write + summary)
+- [x] T104 JSON logging structure is stable (cache_hit/miss/write + summary)
   - File: `tests/log-json.test.ts`
   - Capture `console.log`; assert fields: `evt`, `rel`, `durationMs/sizeBytes` and summary (`total,hits,misses,hitRate,p50,p95,savedMs`)
-- [ ] T105 Corrupted cache entry gracefully degrades to MISS (no crash)
+- [x] T105 Corrupted cache entry gracefully degrades to MISS (no crash)
   - File: `tests/corrupt-entry.test.ts`
   - Pre-write invalid JSON under cacache for a computed key
-- [ ] T106 [P] Windows-like path normalization regression
+- [x] T106 [P] Windows-like path normalization regression
   - File: `tests/path-windows-regression.test.ts`
   - `C:\\Docs\\A.MD` と `/@fs/C:/Docs/A.MD` が同一 rel に正規化
 
 ## Phase 3.3: Core Implementation (ONLY after tests are red)
-- [ ] T201 Implement `include`/`exclude` option (globs)
+- [x] T201 Implement `include`/`exclude` option (globs)
   - File: `plugins/fastmd-cache/index.mjs`
   - Proposal: add `picomatch` for performance/consistency（代替: `minimatch`, 自前実装）。PR で理由・影響・代替案を明記。
-- [ ] T202 Add `salt` option + `FASTMD_SALT`（キーへ反映）
-- [ ] T203 Inject bundler `mode` into key（`configResolved` から取得）
-- [ ] T204 Ensure JSON logs include `sizeBytes`/`durationMs` and summary includes `savedMs`（既存出力のフィールド整合をテストと合わせる）
+- [x] T202 Add `salt` option + `FASTMD_SALT`（キーへ反映）
+- [x] T203 Inject bundler `mode` into key（`configResolved` から取得）
+- [x] T204 Ensure JSON logs include `sizeBytes`/`durationMs` and summary includes `savedMs`（既存出力のフィールド整合をテストと合わせる）
 - [x] T205 Remove unused `persist` option from config merge（混乱回避）
-- [ ] T206 Add `plugins/fastmd-cache/index.d.ts` (factory tuple types, `clearCache`, `warmup`)
+- [x] T206 Add `plugins/fastmd-cache/index.d.ts` (factory tuple types, `clearCache`, `warmup`)
 
 ## Phase 3.4: Integration
-- [ ] T301 Update `README.md` with usage: Vite/Astro config, ENV overrides, logging modes, cache ops (`clearCache`, `warmup`)
+- [x] T301 Update `README.md` with usage: Vite/Astro config, ENV overrides, logging modes, cache ops (`clearCache`, `warmup`)
 - [ ] T302 Add `examples/fastmd-vite` (minimal `vite.config.ts` + 2 MD/MDX files)
-- [ ] T303 Add `scripts/bench.sh` for MISS→HIT timing（3-run protocol）
+- [x] T303 Add `scripts/bench.sh` for MISS→HIT timing（3-run protocol）
 
 ## Phase 3.5: Polish
 - [ ] T401 [P] Lint/Typecheck gates pass (`pnpm check && pnpm typecheck`)

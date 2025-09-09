@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "types:gen": "tsc -p tsconfig.types.json",
     "knip": "knip",
-    "native:build": "pnpm -C native/fastmd-native dlx @napi-rs/cli@latest build --release",
+    "native:build": "bash -lc 'cd native/fastmd-native && pnpm --package=@napi-rs/cli@latest dlx napi build --release'",
     "native:test": "pnpm -C native/fastmd-native exec cargo test",
     "test:native": "FASTMD_NATIVE=1 bun test"
   },

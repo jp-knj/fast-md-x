@@ -45,6 +45,22 @@ pub fn deps_digest(paths: Vec<String>) -> String {
   format!("{:x}", hasher.finalize())
 }
 
+/// Normalize content for stable hashing:
+/// - Remove a leading U+FEFF BOM if present
+/// - Convert CRLF/CR to LF
+#[napi]
+pub fn normalize_content(input: String) -> String {
+  // Strip UTF-8 BOM represented as U+FEFF if present
+  let s = if input.chars().next() == Some('\u{feff}') {
+    input.chars().skip(1).collect::<String>()
+  } else {
+    input
+  };
+  // Replace CRLF first, then remaining CR
+  let s = s.replace("\r\n", "\n");
+  s.replace('\r', "\n")
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -213,5 +229,13 @@ mod tests {
       p.set_mode(0o755);
       fs::set_permissions(&locked, p)
     };
+  }
+
+  #[test]
+  fn normalize_content_strips_bom_and_normalizes_newlines() {
+    // BOM + CRLF
+    let s = format!("{}{}", '\u{feff}', "line1\r\nline2\rline3\n");
+    let n = normalize_content(s);
+    assert_eq!(n, "line1\nline2\nline3\n");
   }
 }

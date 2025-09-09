@@ -18,7 +18,7 @@ cd native/fastmd-native
 2) @napi-rs/cli でビルド（リリース）:
 
 ```bash
-pnpm dlx @napi-rs/cli@latest build --release
+pnpm --package=@napi-rs/cli@latest dlx napi build --release
 # うまくいけば、このディレクトリに index.node が生成されます
 ```
 
@@ -64,4 +64,3 @@ cargo test
 内容:
 - 既存/欠損ファイルを混在させたときのダイジェスト（`path|size|mtimeMs\n`連結→sha256）
 - 入力順序に依らず同一ダイジェスト（安定ソート）
-
