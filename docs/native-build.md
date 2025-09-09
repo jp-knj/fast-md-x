@@ -1,30 +1,35 @@
-# Native Build Guide (R1) — fast-md-x
+# Native Build Guide (WASM) — fast-md-x
 
-このドキュメントは、オプションのネイティブモジュール（Rust, napi-rs）をローカルでビルドして試すための最小手順です。既定では JS フォールバックで動作します。ネイティブはオプトイン（FASTMD_NATIVE=1）です。
+このドキュメントは、オプションのネイティブモジュール（Rust, WebAssembly）をローカルでビルドして試すための最小手順です。既定では JS フォールバックで動作します。ネイティブはオプトイン（FASTMD_NATIVE=1）です。
 
 ## 前提条件
 - Node.js 18+（推奨: 20+）
 - Rust（stable）: `rustup` で導入済み
+- wasm-pack: `curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh`
 - pnpm（任意）: `corepack enable` で利用可
-- macOS/Linux/Windows いずれも可（Windows は MSVC Build Tools が必要）
+- 全プラットフォーム対応（Linux/macOS/Windows）
 
-## ビルド手順（@napi-rs/cli）
-1) ルート直下から、ネイティブパッケージへ移動:
-
-```bash
-cd native/fastmd-native
-```
-
-2) @napi-rs/cli でビルド（リリース）:
+## ビルド手順（wasm-pack）
+1) ルート直下から実行:
 
 ```bash
-pnpm --package=@napi-rs/cli@latest dlx napi build --release
-# うまくいけば、このディレクトリに index.node が生成されます
+pnpm native:build
+# または
+cd native/fastmd-native && wasm-pack build --target nodejs --out-name fastmd_native
 ```
 
-- 生成物: `native/fastmd-native/index.node`
+2) 開発ビルド（最適化なし、高速）:
+
+```bash
+pnpm native:build:dev
+```
+
+- 生成物: `native/fastmd-native/pkg/` ディレクトリ内
+  - `fastmd_native_bg.wasm` - WebAssembly バイナリ
+  - `fastmd_native.js` - JavaScript バインディング
+  - `index.js` - Node.js 互換ラッパー
 - このモジュールは `plugins/fastmd-cache/native-bridge.mjs` から動的に読み込まれます
-- 読み込み条件: `FASTMD_NATIVE=1` かつ `@fastmd/native` もしくは `native/fastmd-native/index.js` 経由で `index.node` が解決できること
+- 読み込み条件: `FASTMD_NATIVE=1` かつ `@fastmd/native` もしくは `native/fastmd-native/index.js` 経由で WASM モジュールが解決できること
 
 ## 動作確認（スモーク）
 ルート直下で実行:
@@ -43,14 +48,23 @@ scripts/native-smoke.sh path/to/a.md path/to/b.mdx
 - `js:` と `native:` のハッシュが一致（フォーマット: `path|size|mtimeMs\n` の安定連結 → sha256hex）
 
 ## トラブルシュート
-- index.node が見つからない: `pnpm dlx @napi-rs/cli build --release` を `native/fastmd-native` で実行しているか確認
-- Node 互換性: Cargo.toml は `napi = { features = ["napi8"] }` です。Node 18/20 では後方互換で動作します
-- Windows: MSVC ツールチェーン（Visual Studio Build Tools）を導入
+- WASM モジュールが見つからない: `pnpm native:build` を実行して `pkg/` ディレクトリが生成されているか確認
+- Node 互換性: WebAssembly は Node.js 12 以降でサポート。推奨は Node 18+
+- ビルドエラー: `wasm-pack` がインストールされているか確認
 - それでもダメな場合: `FASTMD_NATIVE` を外せば JS フォールバックで動作します
 
+## WebAssembly の利点
+- **クロスプラットフォーム**: 単一のバイナリが全プラットフォームで動作
+- **配布が簡単**: プラットフォーム別のビルドが不要
+- **インストール簡単**: ユーザーに Rust ツールチェーンが不要
+- **セキュア**: サンドボックス環境で実行
+- **将来性**: ブラウザでも動作可能（Astro のクライアントサイドでの利用も可能）
+
 ## 補足
-- 現状 prebuild 配布は未対応（R1 の範囲外）。CI/テストは常に JS 経路が基準です
-- 将来 R2 として prebuild（actions + matrix）を導入予定
+- CI で WASM ビルドが自動化されています（.github/workflows/native-prebuild.yml）
+- リリースタグ（`native-v*`）や手動実行で、WASM モジュールを GitHub Release から取得可能
+- 単一の WASM ファイルで全プラットフォームに対応（prebuild マトリクス不要）
+- npm への配布も将来的に検討中
 
 ## Rust 側テスト（雛形）
 

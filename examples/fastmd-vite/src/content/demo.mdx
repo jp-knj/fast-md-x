@@ -1,0 +1,94 @@
+---
+title: Demo MDX Component
+layout: default
+interactive: true
+---
+
+import { useState } from 'react';
+
+# Demo MDX Component
+
+This MDX file demonstrates caching of files with **JSX components** and **imports**.
+
+## Interactive Counter
+
+export const Counter = () => {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div style={{ padding: '1rem', border: '2px solid #0066cc', borderRadius: '8px' }}>
+      <h3>Interactive Counter</h3>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>
+        Increment
+      </button>
+    </div>
+  );
+};
+
+<Counter />
+
+## Benefits of Caching MDX
+
+MDX files are more complex than regular Markdown:
+- They include **JavaScript imports**
+- They can contain **React components**
+- They support **JSX syntax**
+
+Despite this complexity, fastmd-cache handles them efficiently:
+
+1. **Parse once**: The MDX → JS transformation is cached
+2. **Fast rebuilds**: Subsequent builds skip the transformation
+3. **Smart invalidation**: Changes to imports trigger cache refresh
+
+## Code with Syntax Highlighting
+
+```jsx
+// React component example
+const Greeting = ({ name, emoji = '👋' }) => {
+  return (
+    <div className="greeting">
+      <h2>{emoji} Hello, {name}!</h2>
+      <p>Welcome to the MDX demo</p>
+    </div>
+  );
+};
+
+export default Greeting;
+```
+
+## Data Export
+
+You can export data from MDX files:
+
+export const metadata = {
+  version: '1.0.0',
+  framework: 'Vite',
+  plugin: 'fastmd-cache',
+  features: ['caching', 'invalidation', 'metrics']
+};
+
+<div style={{ background: '#f0f0f0', padding: '1rem', borderRadius: '4px' }}>
+  <h3>Exported Metadata</h3>
+  <pre>{JSON.stringify(metadata, null, 2)}</pre>
+</div>
+
+## Performance Metrics
+
+The cache system tracks:
+- **Hit rate**: Percentage of cache hits vs misses
+- **Build time saved**: Time saved by using cached results
+- **File dependencies**: Tracks which files affect each cached entry
+
+## Try It Out
+
+1. Run `npm run build` - First build creates cache
+2. Run `npm run build` again - See the speed improvement!
+3. Modify this file - Cache intelligently invalidates
+4. Check `.fastmd-cache` directory for cached entries
+
+---
+
+<footer style={{ marginTop: '2rem', padding: '1rem', background: '#333', color: '#fff' }}>
+  <p>fastmd-cache - Making MDX builds faster, one cache at a time 🚀</p>
+</footer>

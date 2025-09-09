@@ -1,0 +1,154 @@
+name: Native WASM Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "native-v*"
+
+concurrency:
+  group: native-wasm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build WASM Module
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.13.1
+
+      - name: Enable pnpm via Corepack
+        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: |
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM module
+        run: pnpm native:build
+
+      - name: Package artifact
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cp -v native/fastmd-native/fastmd_native_bg.wasm artifacts/
+          cp -v native/fastmd-native/fastmd_native.js artifacts/
+          cp -v native/fastmd-native/fastmd_native.d.ts artifacts/ || true
+          cp -v native/fastmd-native/index.js artifacts/
+          cp -v native/fastmd-native/index.d.ts artifacts/ || true
+          cp -v native/fastmd-native/package.json artifacts/
+          
+          # Create tarball
+          tar -C artifacts -czf fastmd-native-wasm.tar.gz .
+          
+          # Generate SHA256 checksum
+          sha256sum fastmd-native-wasm.tar.gz > fastmd-native-wasm.tar.gz.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastmd-native-wasm
+          path: |
+            fastmd-native-wasm.tar.gz
+            fastmd-native-wasm.tar.gz.sha256
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: fastmd-native-wasm
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Native WASM Module ${{ github.ref_name }}
+          body: |
+            ## WebAssembly Module Release
+            
+            This release contains the pre-built WebAssembly module for fast-md-x.
+            
+            ### Installation
+            
+            1. Download `fastmd-native-wasm.tar.gz`
+            2. Extract to `native/fastmd-native/`
+            3. Set `FASTMD_NATIVE=1` environment variable
+            
+            ### Verification
+            
+            Verify the download with the provided SHA256 checksum:
+            ```bash
+            sha256sum -c fastmd-native-wasm.tar.gz.sha256
+            ```
+            
+            ### Compatibility
+            
+            - Works on all platforms (Linux, macOS, Windows)
+            - Requires Node.js 18+
+            - No Rust toolchain needed
+          files: |
+            fastmd-native-wasm.tar.gz
+            fastmd-native-wasm.tar.gz.sha256
+          draft: false
+          prerelease: false
+
+  test:
+    name: Test WASM Module
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [18, 20, 22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.13.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fastmd-native-wasm
+
+      - name: Extract WASM module
+        shell: bash
+        run: |
+          tar -xzf fastmd-native-wasm.tar.gz -C native/fastmd-native/
+
+      - name: Run tests with WASM
+        run: pnpm test:native
+        env:
+          FASTMD_NATIVE: "1"

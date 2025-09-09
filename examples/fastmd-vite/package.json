@@ -1,0 +1,19 @@
+{
+  "name": "fastmd-vite-example",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Example Vite project using fastmd-cache plugin",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist .fastmd-cache"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "vue": "^3.4.0"
+  }
+}
