@@ -122,4 +122,35 @@ mod tests {
     let d2 = deps_digest(vec![p_b, p_a]);
     assert_eq!(d1, d2);
   }
+
+  #[test]
+  fn digest_empty_is_sha256_of_empty() {
+    let got = deps_digest(vec![]);
+    // sha256("")
+    assert_eq!(got, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  }
+
+  #[test]
+  fn digest_unicode_path_non_empty() {
+    let dir = tmp_dir();
+    let uni = dir.join("こんにちは.md");
+    {
+      let mut f = fs::File::create(&uni).unwrap();
+      let _ = f.write_all(b"# hello\n");
+    }
+    let p = uni.to_string_lossy().to_string();
+    let d = deps_digest(vec![p]);
+    assert_eq!(d.len(), 64);
+    assert!(d.chars().all(|c| c.is_ascii_hexdigit()));
+  }
+
+  #[test]
+  fn digest_directory_is_stable() {
+    let dir = tmp_dir();
+    let p = dir.to_string_lossy().to_string();
+    let d1 = deps_digest(vec![p.clone()]);
+    let d2 = deps_digest(vec![p]);
+    assert_eq!(d1.len(), 64);
+    assert_eq!(d1, d2);
+  }
 }
