@@ -32,7 +32,7 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
     process.env.FASTMD_NATIVE_MODULE = modPath;
 
     // dynamic import after env set
-    const m = await import('../../plugins/fastmd-cache/native-bridge.mjs');
+    const m = await import('../../packages/fastmd-cache/native-bridge.mjs');
     const stub = m.loadFastmdNative();
     expect(!!stub).toBe(true);
     // depsDigestNative should call the stub
@@ -47,7 +47,7 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
     const prevEnv = { ...process.env };
     process.env.FASTMD_NATIVE = undefined as unknown as string;
     process.env.FASTMD_NATIVE_MODULE = path.join(TMP_DIR, 'nope.js');
-    const m = await import('../../plugins/fastmd-cache/native-bridge.mjs');
+    const m = await import('../../packages/fastmd-cache/native-bridge.mjs');
     const stub = m.loadFastmdNative();
     expect(stub).toBeNull();
     // depsDigestNative returns null when not enabled
@@ -62,7 +62,7 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
     const prevEnv = { ...process.env };
     process.env.FASTMD_NATIVE = '1';
     process.env.FASTMD_NATIVE_MODULE = modPath;
-    const m = await import('../../plugins/fastmd-cache/native-bridge.mjs');
+    const m = await import('../../packages/fastmd-cache/native-bridge.mjs');
     const stub = m.loadFastmdNative();
     // Should be null since it doesn't expose deps_digest
     expect(stub).toBeNull();
@@ -80,7 +80,7 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
     const prevEnv = { ...process.env };
     process.env.FASTMD_NATIVE = '1';
     process.env.FASTMD_NATIVE_MODULE = modPath;
-    const m = await import('../../plugins/fastmd-cache/native-bridge.mjs');
+    const m = await import('../../packages/fastmd-cache/native-bridge.mjs');
     const res = m.depsDigestNative(['y'], undefined as unknown as unknown);
     expect(res).toBeNull();
     process.env = prevEnv;

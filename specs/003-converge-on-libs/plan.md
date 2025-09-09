@@ -29,7 +29,7 @@
 - 失敗時はスキップ（strict でも fail-closed しない）
 
 7) 型定義: JSDoc + `tsc --emitDeclarationOnly`
-- `plugins/fastmd-cache/index.mjs` に JSDoc 付与
+- `packages/fastmd-cache/index.mjs` に JSDoc 付与
 - `tsconfig.types.json` を追加、`dist/types` へ出力
 - 当面は既存 `index.d.ts` 併存（切替は後続）
 

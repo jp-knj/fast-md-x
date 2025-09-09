@@ -28,7 +28,7 @@ pnpm native:build:dev
   - `fastmd_native_bg.wasm` - WebAssembly バイナリ
   - `fastmd_native.js` - JavaScript バインディング
   - `index.js` - Node.js 互換ラッパー
-- このモジュールは `plugins/fastmd-cache/native-bridge.mjs` から動的に読み込まれます
+- このモジュールは `packages/fastmd-cache/native-bridge.mjs` から動的に読み込まれます
 - 読み込み条件: `FASTMD_NATIVE=1` かつ `@fastmd/native` もしくは `native/fastmd-native/index.js` 経由で WASM モジュールが解決できること
 
 ## 動作確認（スモーク）

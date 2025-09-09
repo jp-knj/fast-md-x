@@ -7,7 +7,7 @@ Format: `[ID] [P?] Description` — [P] = parallel-safe（異なるファイル�
 
 ## Phase 3.1: Setup
 - [ ] T001 Confirm working branch `002-fastmd-x` and reference spec/plan links in PR
-- [x] T002 [P] Add JSDoc for public API (factory, `clearCache`, `warmup`) in `plugins/fastmd-cache/index.mjs`
+- [x] T002 [P] Add JSDoc for public API (factory, `clearCache`, `warmup`) in `packages/fastmd-cache/index.mjs`
 
 ## Phase 3.2: Tests First (must fail before 3.3)
 - [x] T101 include/exclude globs are honored
@@ -30,13 +30,13 @@ Format: `[ID] [P?] Description` — [P] = parallel-safe（異なるファイル�
 
 ## Phase 3.3: Core Implementation (ONLY after tests are red)
 - [x] T201 Implement `include`/`exclude` option (globs)
-  - File: `plugins/fastmd-cache/index.mjs`
+  - File: `packages/fastmd-cache/index.mjs`
   - Proposal: add `picomatch` for performance/consistency（代替: `minimatch`, 自前実装）。PR で理由・影響・代替案を明記。
 - [x] T202 Add `salt` option + `FASTMD_SALT`（キーへ反映）
 - [x] T203 Inject bundler `mode` into key（`configResolved` から取得）
 - [x] T204 Ensure JSON logs include `sizeBytes`/`durationMs` and summary includes `savedMs`（既存出力のフィールド整合をテストと合わせる）
 - [x] T205 Remove unused `persist` option from config merge（混乱回避）
-- [x] T206 Add `plugins/fastmd-cache/index.d.ts` (factory tuple types, `clearCache`, `warmup`)
+- [x] T206 Add `packages/fastmd-cache/index.d.ts` (factory tuple types, `clearCache`, `warmup`)
 
 ## Phase 3.4: Integration
 - [x] T301 Update `README.md` with usage: Vite/Astro config, ENV overrides, logging modes, cache ops (`clearCache`, `warmup`)

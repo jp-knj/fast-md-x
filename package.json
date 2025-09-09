@@ -18,7 +18,12 @@
     "native:test": "pnpm -C native/fastmd-native exec cargo test",
     "native:build:dev": "bash -lc 'cd native/fastmd-native && wasm-pack build --dev --target nodejs --out-name fastmd_native'",
     "test:native": "FASTMD_NATIVE=1 bun test",
-    "bench": "node benchmarks/native-performance.cjs"
+    "bench": "node benchmarks/native-performance.cjs",
+    "bench:engines": "node bench/run.mjs --engine=all --pages=10",
+    "bench:heavy": "node bench/run.mjs --engine=all --pages=10 --heavy",
+    "packages:build": "pnpm -r --filter './packages/*' build",
+    "sidecar:build": "cd engines/sidecar && cargo build --release",
+    "sidecar:test": "cd engines/sidecar && cargo test"
   },
   "dependencies": {
     "astro": "5.13.5",

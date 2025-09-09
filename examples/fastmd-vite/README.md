@@ -36,7 +36,7 @@ examples/fastmd-vite/
 The `vite.config.ts` shows how to configure the fastmd-cache plugin:
 
 ```typescript
-import fastmdCache from '../../plugins/fastmd-cache/index.mjs';
+import fastmdCache from '../../packages/fastmd-cache/index.mjs';
 
 export default defineConfig({
   plugins: [
@@ -139,4 +139,4 @@ pnpm clean
 
 - [Vite Documentation](https://vitejs.dev)
 - [MDX Documentation](https://mdxjs.com)
-- [Plugin Source](../../plugins/fastmd-cache/)
+- [Plugin Source](../../packages/fastmd-cache/)

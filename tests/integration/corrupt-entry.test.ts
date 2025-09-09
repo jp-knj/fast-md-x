@@ -11,7 +11,7 @@ import path from 'node:path';
 import cacache from 'cacache';
 import matter from 'gray-matter';
 import stringify from 'json-stable-stringify';
-import fastmdCache, { __internals } from '../../plugins/fastmd-cache/index.mjs';
+import fastmdCache, { __internals } from '../../packages/fastmd-cache/index.mjs';
 import { type TransformLike, callTransform } from '../_utils';
 
 function mkTmp() {

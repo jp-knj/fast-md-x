@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from 'bun:test';
 import path from 'node:path';
-import fastmdCache from '../../plugins/fastmd-cache/index.mjs';
+import fastmdCache from '../../packages/fastmd-cache/index.mjs';
 import { type TransformLike, callTransform } from '../_utils';
 
 function mkTmp() {

@@ -5,7 +5,7 @@
 - 方針: 自作しない。既存の設計と挙動は可能な限り保持し、差分は小さく。段階的に計測→是非判断。
 
 ## 2. スコープ
-- 対象: `plugins/fastmd-cache/index.mjs` と付随の開発ドキュメント/設定。
+- 対象: `packages/fastmd-cache/index.mjs` と付随の開発ドキュメント/設定。
 - 非対象: キャッシュ戦略（cacache）やキー構成の根幹は変更しない（内容+frontmatter+features+toolchain+path+mode+salt）。
 
 ## 3. 置き換えマップ（決定）

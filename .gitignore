@@ -26,3 +26,17 @@ pnpm-debug.log*
 
 # editor
 .idea
+
+# TypeScript build outputs
+packages/*/dist/
+packages/*/*.tsbuildinfo
+
+# Rust/Cargo outputs
+engines/*/target/
+engines/*/Cargo.lock
+
+# Benchmark temp files
+bench/test-pages/
+
+# WASM build outputs
+native/*/pkg/

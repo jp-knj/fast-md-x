@@ -1,0 +1,32 @@
+{
+  "name": "@fastmd/plugin-transform",
+  "version": "0.1.0",
+  "description": "Transform plugin that connects to FastMD sidecar",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["fastmd", "vite", "transform", "sidecar"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@fastmd/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^5.0.0"
+  },
+  "peerDependencies": {
+    "vite": ">=4.0.0"
+  }
+}

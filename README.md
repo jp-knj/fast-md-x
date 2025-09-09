@@ -59,7 +59,7 @@ Notes:
 
 This repo includes a Vite plugin that caches the final JS(+map) generated from Markdown/MDX transforms using a stable cache key.
 
-- Location: `plugins/fastmd-cache/index.mjs`
+- Location: `packages/fastmd-cache/index.mjs`
 - Wired by default in `astro.config.mjs` via `vite.plugins`.
 
 ### Usage (Astro)
@@ -68,7 +68,7 @@ This repo includes a Vite plugin that caches the final JS(+map) generated from M
 
 ```js
 import { defineConfig } from 'astro/config';
-import fastmdCache from './plugins/fastmd-cache/index.mjs';
+import fastmdCache from './packages/fastmd-cache/index.mjs';
 
 export default defineConfig({
   vite: {
@@ -115,7 +115,7 @@ Logging:
 - Summary (default): one line per build with totals and percentiles
 - JSON (`FASTMD_LOG=json`): NDJSON rows: `cache_miss`, `cache_write`, `cache_hit`, `summary`
 
-JSON schema: see `schemas/fastmd-log.schema.json` and the exported TypeScript union `FastMdLogEvent` in `plugins/fastmd-cache/index.d.ts`.
+JSON schema: see `schemas/fastmd-log.schema.json` and the exported TypeScript union `FastMdLogEvent` in `packages/fastmd-cache/index.d.ts`.
 
 Example JSON logging:
 

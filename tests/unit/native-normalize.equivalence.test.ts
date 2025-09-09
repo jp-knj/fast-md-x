@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test';
 // Compare JS normalization (__internals) vs native normalize_content when available
 
 async function getInternals() {
-  const m = await import('../../plugins/fastmd-cache/index.mjs');
+  const m = await import('../../packages/fastmd-cache/index.mjs');
   // __internals export exists; pick stripBOM + normalizeNewlines
   const i: any = (m as any).__internals;
   return {
@@ -14,7 +14,7 @@ async function getInternals() {
 }
 
 async function getNative() {
-  const bridge = await import('../../plugins/fastmd-cache/native-bridge.mjs');
+  const bridge = await import('../../packages/fastmd-cache/native-bridge.mjs');
   return bridge.loadFastmdNative();
 }
 
