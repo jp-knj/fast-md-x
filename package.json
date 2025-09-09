@@ -14,9 +14,11 @@
     "typecheck": "tsc --noEmit",
     "types:gen": "tsc -p tsconfig.types.json",
     "knip": "knip",
-    "native:build": "bash -lc 'cd native/fastmd-native && pnpm --package=@napi-rs/cli@latest dlx napi build --release'",
+    "native:build": "bash -lc 'cd native/fastmd-native && wasm-pack build --target nodejs --out-name fastmd_native'",
     "native:test": "pnpm -C native/fastmd-native exec cargo test",
-    "test:native": "FASTMD_NATIVE=1 bun test"
+    "native:build:dev": "bash -lc 'cd native/fastmd-native && wasm-pack build --dev --target nodejs --out-name fastmd_native'",
+    "test:native": "FASTMD_NATIVE=1 bun test",
+    "bench": "node benchmarks/native-performance.cjs"
   },
   "dependencies": {
     "astro": "5.13.5",

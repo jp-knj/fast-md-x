@@ -49,4 +49,3 @@ describe('native normalize_content equivalence (when available)', () => {
     }
   });
 });
-

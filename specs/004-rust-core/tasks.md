@@ -11,7 +11,10 @@
 - [x] Implement `normalize_content` in Rust（BOM除去 + 改行正規化）
 - [ ] JS ↔ Rust 正規化の同値性テスト（ゴールデン/プロパティ）
 - [ ] CI: `FASTMD_NATIVE=1` で Linux ジョブ追加（`pnpm native:build && pnpm test:native`）
-- [ ] Prebuild 配布（napi prebuild, GitHub Actions matrix: macOS/Linux x64/arm64, Windows 検討）
+- [x] Prebuild 配布（WebAssembly による単一バイナリ配布）
+  - [x] NAPI から WebAssembly への移行完了
+  - [x] GitHub Actions での WASM ビルド自動化
+  - [x] GitHub Release への自動公開設定
 - [ ] Windows 特有テスト（junction/symlink、ACL deny、長パス）
 - [ ] ベンチ導入（hyperfine + actions-benchmark）
 - [ ] README のネイティブ節を現状（crate あり）へ更新・整合

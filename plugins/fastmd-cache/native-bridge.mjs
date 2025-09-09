@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 /**
- * Attempt to load a native addon when FASTMD_NATIVE=1. Never throws; returns null on failure.
+ * Attempt to load a native addon (WASM) when FASTMD_NATIVE=1. Never throws; returns null on failure.
+ * The WASM module provides synchronous functions that are compatible with the original NAPI interface.
  */
 export function loadFastmdNative() {
   if (process.env.FASTMD_NATIVE !== '1') return null;
