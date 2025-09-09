@@ -158,10 +158,13 @@ An optional native path (N-API, Rust via napi-rs) is being introduced behind a f
 
 - Enable: set `FASTMD_NATIVE=1` to allow the plugin to try a native module for dependency digesting.
 - Fallback: if the native module is not present or fails to load, the JS implementation is used.
-- Status: The bridge is present; the native crate will be added in a later step. No behavior change by default.
+- Status: The native bridge and crate are present. `deps_digest` and `normalize_content` are implemented; the path is optional and guarded by `FASTMD_NATIVE=1`. JS fallback remains the default.
 
 Local smoke test (optional):
-- Build a local `index.node` under `native/fastmd-native/` using your preferred napi-rs workflow.
+- Build a local `index.node` under `native/fastmd-native/` using @napi-rs/cli:
+  - `pnpm native:test` (Rust unit tests)
+  - `pnpm native:build` (builds `native/fastmd-native/index.node`)
+  - `FASTMD_NATIVE=1 pnpm test:native` (runs JS tests with native path enabled)
 - Then compare JS vs native digests for a set of files:
 
 ```bash

@@ -238,4 +238,32 @@ mod tests {
     let n = normalize_content(s);
     assert_eq!(n, "line1\nline2\nline3\n");
   }
+
+  #[cfg(windows)]
+  #[test]
+  fn digest_windows_symlink_if_possible_else_skip() {
+    use std::os::windows::fs as winfs;
+    let dir = tmp_dir();
+    let target = dir.join("w_target.md");
+    let link = dir.join("w_link.md");
+    // create target file
+    {
+      let mut f = fs::File::create(&target).unwrap();
+      let _ = f.write_all(b"# t\n");
+    }
+    // Try to create a symlink (may require privileges)
+    match winfs::symlink_file(&target, &link) {
+      Ok(_) => {
+        let d = deps_digest(vec![
+          target.to_string_lossy().to_string(),
+          link.to_string_lossy().to_string(),
+        ]);
+        assert_eq!(d.len(), 64);
+      }
+      Err(_) => {
+        // Best-effort skip if symlink creation is not permitted
+        eprintln!("[skip] windows symlink requires privileges");
+      }
+    }
+  }
 }
