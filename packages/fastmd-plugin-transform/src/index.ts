@@ -69,8 +69,13 @@ class SidecarClient {
     });
 
     this.process.on('exit', (code) => {
-      console.log(`Sidecar process exited with code ${code}`);
-      this.cleanup();
+      if (code !== 0 && code !== null) {
+        console.log(`Sidecar process exited with code ${code}`);
+      }
+      // Don't call cleanup here if we're already shutting down
+      if (this.process) {
+        this.cleanup();
+      }
     });
 
     // Ping to verify connection
@@ -107,7 +112,7 @@ class SidecarClient {
 
     this.pendingRequests.set(id, deferred);
 
-    const line = `${JSON.stringify(request)}\\n`;
+    const line = `${JSON.stringify(request)}\n`;
     this.process.stdin.write(line);
 
     // Add timeout
@@ -141,7 +146,11 @@ class SidecarClient {
 
   async shutdown(): Promise<void> {
     if (this.process) {
-      await this.sendRequest('shutdown');
+      try {
+        await this.sendRequest('shutdown');
+      } catch (err) {
+        // Ignore errors during shutdown
+      }
       this.cleanup();
     }
   }
@@ -167,7 +176,7 @@ function getEngineMode(options: FastMdTransformOptions): EngineMode {
   if (options.engine) {
     return options.engine;
   }
-  
+
   const envEngine = process.env.FASTMD_RS || process.env.FASTMD_ENGINE;
   if (envEngine) {
     const normalized = envEngine.toLowerCase();
@@ -176,7 +185,7 @@ function getEngineMode(options: FastMdTransformOptions): EngineMode {
     }
     console.warn(`[fastmd-transform] Invalid FASTMD_RS value: ${envEngine}, using 'off'`);
   }
-  
+
   return 'off'; // Default to JS fallback
 }
 
@@ -190,7 +199,7 @@ export default function fastmdTransform(options: FastMdTransformOptions = {}): P
     async buildStart() {
       engineMode = getEngineMode(options);
       console.log(`[fastmd-transform] Engine mode: ${engineMode}`);
-      
+
       // Start sidecar if configured
       if (engineMode === 'sidecar') {
         try {

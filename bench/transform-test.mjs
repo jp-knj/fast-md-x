@@ -13,10 +13,10 @@ const engineMode = process.env.FASTMD_RS || 'off';
 for (const filepath of files) {
   const content = readFileSync(filepath, 'utf-8');
   const filename = basename(filepath);
-  
+
   // Simulate different processing based on engine
   let result;
-  
+
   if (engineMode === 'off') {
     // JS processing simulation
     result = `// JS Transform: ${filename}\nexport default \`${content.replace(/`/g, '\\`')}\`;`;
@@ -29,7 +29,7 @@ for (const filepath of files) {
     // For now, just simulate
     result = `// WASM Transform: ${filename}\nexport default \`<article>${content}</article>\`;`;
   }
-  
+
   // In real usage, we'd write this to output or return it
   // For benchmark, we just process it
   if (result.length === 0) {
