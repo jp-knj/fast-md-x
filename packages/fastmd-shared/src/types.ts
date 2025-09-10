@@ -10,7 +10,7 @@ export interface FastMdFile {
 }
 
 export interface FastMdMetadata {
-  frontmatter?: Record<string, any>;
+  frontmatter?: Record<string, unknown>;
   imports?: string[];
   exports?: string[];
   hasJsx?: boolean;
@@ -19,7 +19,7 @@ export interface FastMdMetadata {
 
 export interface FastMdTransformResult {
   code: string;
-  map?: any;
+  map?: unknown;
   metadata?: FastMdMetadata;
   dependencies?: string[];
 }
@@ -27,7 +27,7 @@ export interface FastMdTransformResult {
 export interface FastMdCacheEntry {
   key: string;
   code: string;
-  map?: any;
+  map?: unknown;
   metadata?: FastMdMetadata;
   timestamp: number;
   size: number;
@@ -66,5 +66,5 @@ export interface FastMdLogEvent {
 export type FastMdPluginHook = (
   code: string,
   id: string,
-  options?: any
+  options?: unknown
 ) => Promise<FastMdTransformResult | null> | FastMdTransformResult | null;

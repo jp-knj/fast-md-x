@@ -1,0 +1,100 @@
+---
+// FastMD.astro - Component for rendering Fast MD-X transformed content
+export interface Props {
+  html: string;
+  frontmatter?: Record<string, any>;
+}
+
+const { html, frontmatter = {} } = Astro.props;
+
+// If a layout is specified in frontmatter, we can use it
+// For now, we'll just render the HTML directly
+// In a more complete implementation, you'd dynamically import the layout
+const Layout = frontmatter.layout ? null : null; // Placeholder for layout logic
+---
+
+{Layout ? (
+  <!-- If we had a layout, we'd use it here -->
+  <Fragment set:html={html} />
+) : (
+  <!-- Direct HTML rendering with Astro's set:html directive -->
+  <article class="fastmd-content">
+    <Fragment set:html={html} />
+  </article>
+)}
+
+<style>
+  .fastmd-content {
+    max-width: 65ch;
+    margin: 0 auto;
+    padding: 2rem;
+    line-height: 1.6;
+  }
+
+  .fastmd-content :global(h1) {
+    font-size: 2.5rem;
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--color-primary, #4f46e5);
+  }
+
+  .fastmd-content :global(h2) {
+    font-size: 2rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .fastmd-content :global(h3) {
+    font-size: 1.5rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .fastmd-content :global(p) {
+    margin-bottom: 1rem;
+  }
+
+  .fastmd-content :global(pre) {
+    background-color: var(--color-code-bg, #f3f4f6);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+  }
+
+  .fastmd-content :global(code) {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.9em;
+  }
+
+  .fastmd-content :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+  }
+
+  .fastmd-content :global(th),
+  .fastmd-content :global(td) {
+    padding: 0.5rem;
+    border: 1px solid var(--color-border, #e5e7eb);
+    text-align: left;
+  }
+
+  .fastmd-content :global(th) {
+    background-color: var(--color-code-bg, #f3f4f6);
+    font-weight: 600;
+  }
+
+  .fastmd-content :global(ul),
+  .fastmd-content :global(ol) {
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+  }
+
+  .fastmd-content :global(blockquote) {
+    border-left: 4px solid var(--color-primary, #4f46e5);
+    padding-left: 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+    color: var(--color-text-secondary, #6b7280);
+  }
+</style>

@@ -4,15 +4,14 @@
  * These tests verify speed improvements and resource efficiency
  */
 
-import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import { performance } from 'node:perf_hooks';
-import { cpus } from 'node:os';
-import { spawn } from 'node:child_process';
-import path from 'node:path';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import fs from 'node:fs/promises';
+import { cpus } from 'node:os';
+import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 // Test helpers
-async function generateMarkdownFiles(count: number, sizeKB: number = 10): Promise<string[]> {
+async function generateMarkdownFiles(count: number, sizeKB = 10): Promise<string[]> {
   const files: string[] = [];
   const testDir = path.join(process.cwd(), '.test-files');
   await fs.mkdir(testDir, { recursive: true });
@@ -79,20 +78,16 @@ async function processWithSidecar(
   const start = performance.now();
 
   // Simulate sidecar processing
-  const env = {
-    ...process.env,
-    FASTMD_RS: 'sidecar',
-    FASTMD_PARALLEL: options.parallel ? 'true' : 'false',
-    FASTMD_WORKERS: String(options.workers || cpus().length)
-  };
-
-  // In real implementation, this would call the actual sidecar
+  // In real implementation, this would call the actual sidecar with env vars:
+  // FASTMD_RS: 'sidecar',
+  // FASTMD_PARALLEL: options.parallel ? 'true' : 'false',
+  // FASTMD_WORKERS: String(options.workers || cpus().length)
   // For now, simulate with a delay based on parallelism
   const baseTime = files.length * 10; // 10ms per file baseline
-  const parallelFactor = options.parallel ? (options.workers || cpus().length) : 1;
+  const parallelFactor = options.parallel ? options.workers || cpus().length : 1;
   const simulatedTime = baseTime / parallelFactor;
 
-  await new Promise(resolve => setTimeout(resolve, simulatedTime));
+  await new Promise((resolve) => setTimeout(resolve, simulatedTime));
 
   const duration = performance.now() - start;
   const throughput = (files.length / duration) * 1000; // files per second
@@ -131,7 +126,7 @@ describe('Parallel Processing Performance', () => {
   describe('Throughput Tests', () => {
     test('processes 100 files under 1 second with parallel processing', async () => {
       const result = await processWithSidecar(testFiles, { parallel: true });
-      
+
       expect(result.duration).toBeLessThan(1000);
       expect(result.throughput).toBeGreaterThan(100); // >100 files/sec
     });
@@ -140,9 +135,9 @@ describe('Parallel Processing Performance', () => {
       const results: Array<{ workers: number; duration: number }> = [];
 
       for (const workers of [1, 2, 4, 8]) {
-        const result = await processWithSidecar(testFiles, { 
-          parallel: true, 
-          workers 
+        const result = await processWithSidecar(testFiles, {
+          parallel: true,
+          workers
         });
         results.push({ workers, duration: result.duration });
       }
@@ -158,7 +153,7 @@ describe('Parallel Processing Performance', () => {
     test('processes 1000 files under 5 seconds', async () => {
       const largeSet = await generateMarkdownFiles(1000, 5);
       const result = await processWithSidecar(largeSet, { parallel: true });
-      
+
       expect(result.duration).toBeLessThan(5000);
       expect(result.throughput).toBeGreaterThan(200); // >200 files/sec
 
@@ -171,21 +166,17 @@ describe('Parallel Processing Performance', () => {
 
   describe('Efficiency Tests', () => {
     test('achieves >80% parallel efficiency on 4 cores', async () => {
-      const singleCore = await processWithSidecar(testFiles, { 
-        parallel: true, 
-        workers: 1 
-      });
-      
-      const multiCore = await processWithSidecar(testFiles, { 
-        parallel: true, 
-        workers: 4 
+      const singleCore = await processWithSidecar(testFiles, {
+        parallel: true,
+        workers: 1
       });
 
-      const efficiency = calculateEfficiency(
-        singleCore.duration,
-        multiCore.duration,
-        4
-      );
+      const multiCore = await processWithSidecar(testFiles, {
+        parallel: true,
+        workers: 4
+      });
+
+      const efficiency = calculateEfficiency(singleCore.duration, multiCore.duration, 4);
 
       expect(efficiency).toBeGreaterThan(0.8); // >80% efficiency
     });
@@ -194,22 +185,18 @@ describe('Parallel Processing Performance', () => {
       const maxCores = Math.min(cpus().length, 8);
       const efficiencies: number[] = [];
 
-      const baseline = await processWithSidecar(testFiles, { 
-        parallel: true, 
-        workers: 1 
+      const baseline = await processWithSidecar(testFiles, {
+        parallel: true,
+        workers: 1
       });
 
       for (let cores = 2; cores <= maxCores; cores *= 2) {
-        const result = await processWithSidecar(testFiles, { 
-          parallel: true, 
-          workers: cores 
+        const result = await processWithSidecar(testFiles, {
+          parallel: true,
+          workers: cores
         });
 
-        const efficiency = calculateEfficiency(
-          baseline.duration,
-          result.duration,
-          cores
-        );
+        const efficiency = calculateEfficiency(baseline.duration, result.duration, cores);
 
         efficiencies.push(efficiency);
       }
@@ -230,7 +217,7 @@ describe('Parallel Processing Performance', () => {
   describe('Latency Tests', () => {
     test('maintains low latency for individual files', async () => {
       const latencies: number[] = [];
-      
+
       // Process files individually to measure latency
       for (let i = 0; i < 100; i++) {
         const start = performance.now();
@@ -242,9 +229,9 @@ describe('Parallel Processing Performance', () => {
       const p95 = percentile(latencies, 95);
       const p99 = percentile(latencies, 99);
 
-      expect(p50).toBeLessThan(5);   // P50 < 5ms
-      expect(p95).toBeLessThan(10);  // P95 < 10ms
-      expect(p99).toBeLessThan(20);  // P99 < 20ms
+      expect(p50).toBeLessThan(5); // P50 < 5ms
+      expect(p95).toBeLessThan(10); // P95 < 10ms
+      expect(p99).toBeLessThan(20); // P99 < 20ms
     });
 
     test('batching improves throughput without hurting latency', async () => {
@@ -254,7 +241,7 @@ describe('Parallel Processing Performance', () => {
       for (const size of batchSizes) {
         const batch = testFiles.slice(0, size);
         const result = await processWithSidecar(batch, { parallel: true });
-        
+
         results.push({
           size,
           latency: result.duration / size, // Per-file latency
@@ -279,7 +266,7 @@ describe('Parallel Processing Performance', () => {
       const parallel = await processWithSidecar(testFiles, { parallel: true });
 
       const speedup = sequential.duration / parallel.duration;
-      
+
       expect(speedup).toBeGreaterThan(2); // At least 2x faster
       console.log(`Parallel speedup: ${speedup.toFixed(2)}x`);
     });
@@ -290,10 +277,10 @@ describe('Parallel Processing Performance', () => {
 
       for (const count of fileCounts) {
         const files = testFiles.slice(0, count);
-        
+
         const sequential = await processWithSidecar(files, { parallel: false });
         const parallel = await processWithSidecar(files, { parallel: true });
-        
+
         speedups.push(sequential.duration / parallel.duration);
       }
 
@@ -309,13 +296,13 @@ describe('Resource Usage', () => {
   test('memory usage stays under limit', async () => {
     // This would need actual memory profiling in real implementation
     const initialMemory = process.memoryUsage().heapUsed;
-    
+
     const files = await generateMarkdownFiles(1000, 10);
     await processWithSidecar(files, { parallel: true });
-    
+
     const finalMemory = process.memoryUsage().heapUsed;
     const memoryIncrease = (finalMemory - initialMemory) / (1024 * 1024); // MB
-    
+
     expect(memoryIncrease).toBeLessThan(100); // Less than 100MB increase
 
     // Cleanup
@@ -329,10 +316,10 @@ describe('Resource Usage', () => {
     // For now, we simulate expected behavior
     const coreCount = cpus().length;
     const expectedUtilization = 0.8 * coreCount; // 80% of all cores
-    
+
     // This would be measured during actual processing
     const measuredUtilization = expectedUtilization; // Simulated
-    
+
     expect(measuredUtilization).toBeGreaterThan(0.7 * coreCount);
     expect(measuredUtilization).toBeLessThan(1.0 * coreCount);
   });

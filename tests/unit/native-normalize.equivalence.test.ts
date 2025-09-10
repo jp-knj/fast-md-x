@@ -3,13 +3,20 @@ import { describe, expect, test } from 'bun:test';
 
 // Compare JS normalization (__internals) vs native normalize_content when available
 
+interface InternalsModule {
+  __internals: {
+    stripBOM: (s: string) => string;
+    normalizeNewlines: (s: string) => string;
+  };
+}
+
 async function getInternals() {
-  const m = await import('../../packages/fastmd-cache/index.mjs');
+  const m = (await import('../../packages/fastmd-cache/index.mjs')) as unknown as InternalsModule;
   // __internals export exists; pick stripBOM + normalizeNewlines
-  const i: any = (m as any).__internals;
+  const i = m.__internals;
   return {
-    stripBOM: i.stripBOM as (s: string) => string,
-    normalizeNewlines: i.normalizeNewlines as (s: string) => string
+    stripBOM: i.stripBOM,
+    normalizeNewlines: i.normalizeNewlines
   };
 }
 

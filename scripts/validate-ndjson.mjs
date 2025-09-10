@@ -105,7 +105,9 @@ rl.on('close', () => {
   // Report errors if any
   if (stats.errors.length > 0) {
     console.error('\nValidation errors:');
-    stats.errors.slice(0, 10).forEach((err) => console.error(`  ${err}`));
+    for (const err of stats.errors.slice(0, 10)) {
+      console.error(`  ${err}`);
+    }
     if (stats.errors.length > 10) {
       console.error(`  ... and ${stats.errors.length - 10} more errors`);
     }

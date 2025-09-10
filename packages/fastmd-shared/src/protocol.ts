@@ -10,26 +10,26 @@ export interface RpcRequest {
   jsonrpc: '2.0';
   id: RpcId;
   method: string;
-  params?: any;
+  params?: unknown;
 }
 
 export interface RpcResponse {
   jsonrpc: '2.0';
   id: RpcId;
-  result?: any;
+  result?: unknown;
   error?: RpcError;
 }
 
 export interface RpcError {
   code: number;
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface RpcNotification {
   jsonrpc: '2.0';
   method: string;
-  params?: any;
+  params?: unknown;
 }
 
 // Standard error codes
@@ -78,8 +78,8 @@ export interface TransformRequest {
 
 export interface TransformResponse {
   code: string;
-  map?: any;
-  metadata?: Record<string, any>;
+  map?: unknown;
+  metadata?: Record<string, unknown>;
   dependencies?: string[];
 }
 
@@ -114,16 +114,16 @@ export interface CacheGetResponse {
   found: boolean;
   entry?: {
     code: string;
-    map?: any;
-    metadata?: Record<string, any>;
+    map?: unknown;
+    metadata?: Record<string, unknown>;
   };
 }
 
 export interface CacheSetRequest {
   key: string;
   code: string;
-  map?: any;
-  metadata?: Record<string, any>;
+  map?: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CacheSetResponse {
@@ -146,5 +146,5 @@ export interface ConfigureRequest {
 
 export interface ConfigureResponse {
   success: boolean;
-  applied: Record<string, any>;
+  applied: Record<string, unknown>;
 }

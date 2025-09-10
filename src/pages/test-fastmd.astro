@@ -1,0 +1,41 @@
+---
+// Test page demonstrating the opt-in Fast MD-X transformation
+import BaseLayout from '../layouts/BaseLayout.astro';
+import FastMD from '../components/FastMD.astro';
+
+// Import markdown with ?fastmd to use Rust sidecar transformation
+import { html, frontmatter } from '../content/test.md?fastmd';
+---
+
+<BaseLayout title={frontmatter.title || 'Fast MD-X Test'} description={frontmatter.description}>
+  <main>
+    <header style="text-align: center; padding: 2rem; border-bottom: 1px solid var(--color-border);">
+      <h1>Fast MD-X Transformation Demo</h1>
+      <p>This page uses the <code>?fastmd</code> import to transform Markdown with the Rust sidecar.</p>
+      <div style="margin-top: 1rem;">
+        <span style="background: #10b981; color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem;">
+          Rust Sidecar Active
+        </span>
+      </div>
+    </header>
+
+    <!-- Render the transformed HTML using FastMD component -->
+    <FastMD html={html} frontmatter={frontmatter} />
+
+    <footer style="text-align: center; padding: 2rem; border-top: 1px solid var(--color-border); margin-top: 3rem;">
+      <p style="color: var(--color-text-secondary);">
+        <strong>Frontmatter:</strong> {JSON.stringify(frontmatter, null, 2).substring(0, 100)}...
+      </p>
+      <p style="margin-top: 1rem; font-size: 0.875rem;">
+        Rendered with Fast MD-X • {new Date().toISOString()}
+      </p>
+    </footer>
+  </main>
+</BaseLayout>
+
+<style>
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+</style>

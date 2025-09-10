@@ -14,7 +14,7 @@ const engine = args.find((a) => a.startsWith('--engine='))?.split('=')[1] || 'js
 const pages = Number.parseInt(args.find((a) => a.startsWith('--pages='))?.split('=')[1] || '10');
 const heavy = args.includes('--heavy');
 
-console.log(`Benchmark Configuration:`);
+console.log('Benchmark Configuration:');
 console.log(`  Engine: ${engine}`);
 console.log(`  Pages: ${pages}`);
 console.log(`  Heavy content: ${heavy}`);

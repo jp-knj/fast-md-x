@@ -10,10 +10,12 @@ use crate::protocol::{RpcId, RpcResponse, create_response, create_error_response
 struct TransformRequest {
     file: String,
     content: String,
+    #[allow(dead_code)]
     options: Option<TransformOptions>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct TransformOptions {
     mode: Option<String>,
     sourcemap: Option<bool>,

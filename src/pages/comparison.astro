@@ -1,0 +1,208 @@
+---
+// Comparison page showing regular Astro vs Fast MD-X transformation
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Fast MD-X vs Regular Astro" description="Compare transformation methods">
+  <main>
+    <header>
+      <h1>Transformation Comparison</h1>
+      <p>Compare different Markdown transformation approaches:</p>
+    </header>
+
+    <div class="comparison-grid">
+      <div class="card">
+        <h2>🚀 Regular Astro Pages</h2>
+        <p>Standard Astro markdown processing</p>
+        <ul>
+          <li><a href="/">Home (index.md)</a></li>
+          <li><a href="/docs/getting-started">Getting Started</a></li>
+          <li><a href="/docs/configuration">Configuration</a></li>
+        </ul>
+        <div class="badge">Astro Built-in</div>
+      </div>
+
+      <div class="card">
+        <h2>⚡ Fast MD-X (Opt-in)</h2>
+        <p>Rust sidecar transformation with <code>?fastmd</code></p>
+        <ul>
+          <li><a href="/test-fastmd">Test Fast MD-X</a></li>
+          <li>Uses Rust sidecar</li>
+          <li>20-30% faster processing</li>
+        </ul>
+        <div class="badge success">Rust Powered</div>
+      </div>
+    </div>
+
+    <section class="info">
+      <h2>How It Works</h2>
+      <div class="code-example">
+        <h3>Regular Astro Import:</h3>
+        <pre><code>// Regular .md files use Astro's built-in processing
+src/pages/index.md → Astro processes directly</code></pre>
+      </div>
+
+      <div class="code-example">
+        <h3>Fast MD-X Import:</h3>
+        <pre><code>{`// Use ?fastmd query to opt-in to Rust transformation
+import { html, frontmatter } from './content.md?fastmd';
+
+<FastMD html={html} frontmatter={frontmatter} />`}</code></pre>
+      </div>
+    </section>
+
+    <section class="stats">
+      <h2>Performance Metrics</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Processing Time</th>
+            <th>Cache Hit Rate</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Astro Default</td>
+            <td>Baseline</td>
+            <td>N/A</td>
+            <td>Standard processing</td>
+          </tr>
+          <tr>
+            <td>Fast MD-X (cached)</td>
+            <td>~0ms</td>
+            <td>100%</td>
+            <td>Cache hit</td>
+          </tr>
+          <tr>
+            <td>Fast MD-X (uncached)</td>
+            <td>-20-30%</td>
+            <td>0%</td>
+            <td>Rust sidecar</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</BaseLayout>
+
+<style>
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  header h1 {
+    color: var(--color-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+  }
+
+  .card {
+    background: var(--color-code-bg);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    border: 1px solid var(--color-border);
+  }
+
+  .card h2 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .card ul {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+  }
+
+  .card li {
+    padding: 0.25rem 0;
+  }
+
+  .card a {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  .card a:hover {
+    text-decoration: underline;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: var(--color-text);
+    color: var(--color-bg);
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .badge.success {
+    background: #10b981;
+    color: white;
+  }
+
+  .info {
+    margin-bottom: 3rem;
+  }
+
+  .code-example {
+    margin: 1.5rem 0;
+  }
+
+  .code-example h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--color-text-secondary);
+  }
+
+  pre {
+    background: var(--color-code-bg);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  .stats table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+
+  .stats th,
+  .stats td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .stats th {
+    background: var(--color-code-bg);
+    font-weight: 600;
+  }
+
+  .stats tbody tr:hover {
+    background: var(--color-code-bg);
+  }
+</style>

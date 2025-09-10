@@ -11,6 +11,7 @@ import {
   createRpcRequest,
   generateRequestId
 } from '@fastmd/shared';
+import matter from 'gray-matter';
 import type { Plugin } from 'vite';
 
 export type EngineMode = 'sidecar' | 'wasm' | 'off';
@@ -26,7 +27,7 @@ export interface FastMdTransformOptions {
 
 class SidecarClient {
   private process: ChildProcess | null = null;
-  private pendingRequests = new Map<string, Deferred<any>>();
+  private pendingRequests = new Map<string, Deferred<unknown>>();
   private options: FastMdTransformOptions;
 
   constructor(options: FastMdTransformOptions) {
@@ -101,14 +102,14 @@ class SidecarClient {
     }
   }
 
-  private async sendRequest(method: string, params?: any): Promise<any> {
+  private async sendRequest(method: string, params?: unknown): Promise<unknown> {
     if (!this.process || !this.process.stdin) {
       throw new Error('Sidecar not running');
     }
 
     const id = generateRequestId();
     const request = createRpcRequest(id, method, params);
-    const deferred = createDeferred<any>();
+    const deferred = createDeferred<unknown>();
 
     this.pendingRequests.set(id, deferred);
 
@@ -135,7 +136,7 @@ class SidecarClient {
     await this.sendRequest('ping');
   }
 
-  async transform(file: string, content: string, options?: any): Promise<TransformResponse> {
+  async transform(file: string, content: string, options?: unknown): Promise<TransformResponse> {
     const request: TransformRequest = {
       file,
       content,
@@ -195,6 +196,7 @@ export default function fastmdTransform(options: FastMdTransformOptions = {}): P
 
   return {
     name: 'fastmd-transform',
+    enforce: 'pre', // Run before Astro's markdown processing
 
     async buildStart() {
       engineMode = getEngineMode(options);
@@ -219,44 +221,62 @@ export default function fastmdTransform(options: FastMdTransformOptions = {}): P
     },
 
     async transform(code: string, id: string) {
-      // Only process markdown/mdx files
-      if (!id.endsWith('.md') && !id.endsWith('.mdx')) {
+      // Only process markdown files with ?fastmd query parameter
+      const [filepath, query] = id.split('?');
+
+      // Skip if not a markdown file or doesn't have ?fastmd query
+      if (!filepath.endsWith('.md') || !query?.includes('fastmd')) {
         return null;
       }
 
       // Check include/exclude
-      if (options.include && !matchesPatterns(id, options.include)) {
+      if (options.include && !matchesPatterns(filepath, options.include)) {
         return null;
       }
 
-      if (options.exclude && matchesPatterns(id, options.exclude)) {
+      if (options.exclude && matchesPatterns(filepath, options.exclude)) {
         return null;
       }
+
+      // Parse frontmatter
+      const { content, data: frontmatter } = matter(code);
 
       // Use appropriate engine based on mode
+      let html = '';
+
       if (engineMode === 'sidecar' && client) {
         try {
-          const result = await client.transform(id, code, {
+          const result = await client.transform(filepath, content, {
             mode: this.meta.watchMode ? 'development' : 'production',
-            sourcemap: true,
-            framework: 'vite'
+            sourcemap: false, // Don't need sourcemaps for HTML
+            framework: 'astro'
           });
-
-          return {
-            code: result.code,
-            map: result.map
-          };
+          html = result.code;
         } catch (err) {
           console.warn('[fastmd-transform] Sidecar transform failed:', err);
-          // Fall through to JS processing
+          // Fall through to return empty HTML
+          html = `<p>Error transforming markdown: ${err}</p>`;
         }
       } else if (engineMode === 'wasm') {
         // TODO: Use WASM transform
-        // For now, fall through to JS
+        html = '<p>WASM mode not yet implemented</p>';
+      } else {
+        // Off mode - basic fallback
+        html = '<p>Transform engine is off</p>';
       }
 
-      // JS fallback or 'off' mode - let Vite handle it normally
-      return null;
+      // Return ESM module with html and frontmatter exports
+      // This is what Astro can import and use
+      const moduleCode = `
+export const html = ${JSON.stringify(html)};
+export const frontmatter = ${JSON.stringify(frontmatter || {})};
+export default { html, frontmatter };
+`;
+
+      return {
+        code: moduleCode,
+        map: null
+      };
     },
 
     async buildEnd() {

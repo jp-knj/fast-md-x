@@ -4,12 +4,12 @@
  * These tests push the system to its limits to ensure stability
  */
 
-import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import { performance } from 'node:perf_hooks';
-import { spawn, ChildProcess } from 'node:child_process';
-import path from 'node:path';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
+import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 // Helper to monitor system resources
 class ResourceMonitor {
@@ -20,12 +20,12 @@ class ResourceMonitor {
   }> = [];
   private interval?: Timer;
 
-  start(intervalMs: number = 100) {
+  start(intervalMs = 100) {
     this.samples = [];
     this.interval = setInterval(() => {
       this.samples.push({
         timestamp: Date.now(),
-        memory: process.memoryUsage(),
+        memory: process.memoryUsage()
         // CPU usage would need native binding in real implementation
       });
     }, intervalMs);
@@ -38,7 +38,7 @@ class ResourceMonitor {
   }
 
   getStats() {
-    const memoryValues = this.samples.map(s => s.memory.heapUsed / (1024 * 1024));
+    const memoryValues = this.samples.map((s) => s.memory.heapUsed / (1024 * 1024));
     return {
       peakMemoryMB: Math.max(...memoryValues),
       avgMemoryMB: memoryValues.reduce((a, b) => a + b, 0) / memoryValues.length,
@@ -56,7 +56,7 @@ class MockSidecar {
   async start(): Promise<void> {
     // In real tests, this would start the actual sidecar
     this.ready = true;
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
   async stop(): Promise<void> {
@@ -69,7 +69,7 @@ class MockSidecar {
   async processFiles(files: string[]): Promise<void> {
     if (!this.ready) throw new Error('Sidecar not ready');
     // Simulate processing with some delay
-    await new Promise(resolve => setTimeout(resolve, files.length * 0.5));
+    await new Promise((resolve) => setTimeout(resolve, files.length * 0.5));
   }
 
   isAlive(): boolean {
@@ -81,18 +81,18 @@ class MockSidecar {
 async function generateLargeFile(sizeKB: number): Promise<string> {
   const testDir = path.join(process.cwd(), '.stress-test');
   await fs.mkdir(testDir, { recursive: true });
-  
+
   const filename = path.join(testDir, `large-${Date.now()}-${Math.random()}.md`);
   const chunks: string[] = [];
-  
+
   // Generate content in chunks to avoid memory issues
   const chunkSize = 1024; // 1KB chunks
   const numChunks = sizeKB;
-  
+
   for (let i = 0; i < numChunks; i++) {
     chunks.push('#'.repeat(chunkSize));
   }
-  
+
   await fs.writeFile(filename, chunks.join(''));
   return filename;
 }
@@ -109,7 +109,7 @@ describe('Stress Tests: Concurrent Processing', () => {
   afterAll(async () => {
     monitor.stop();
     await sidecar.stop();
-    
+
     // Cleanup test files
     const testDir = path.join(process.cwd(), '.stress-test');
     await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
@@ -125,11 +125,13 @@ describe('Stress Tests: Concurrent Processing', () => {
 
       // Create and process files concurrently
       for (let i = 0; i < fileCount; i++) {
-        promises.push((async () => {
-          const file = await generateLargeFile(1); // 1KB files
-          await sidecar.processFiles([file]);
-          await fs.unlink(file); // Clean up immediately
-        })());
+        promises.push(
+          (async () => {
+            const file = await generateLargeFile(1); // 1KB files
+            await sidecar.processFiles([file]);
+            await fs.unlink(file); // Clean up immediately
+          })()
+        );
       }
 
       const start = performance.now();
@@ -155,16 +157,18 @@ describe('Stress Tests: Concurrent Processing', () => {
 
       for (const size of sizes) {
         for (let i = 0; i < filesPerSize; i++) {
-          promises.push((async () => {
-            const file = await generateLargeFile(size);
-            await sidecar.processFiles([file]);
-            await fs.unlink(file);
-          })());
+          promises.push(
+            (async () => {
+              const file = await generateLargeFile(size);
+              await sidecar.processFiles([file]);
+              await fs.unlink(file);
+            })()
+          );
         }
       }
 
       await Promise.all(promises);
-      
+
       monitor.stop();
       const stats = monitor.getStats();
 
@@ -174,7 +178,7 @@ describe('Stress Tests: Concurrent Processing', () => {
 
     test('handles rapid fire requests', async () => {
       await sidecar.start();
-      
+
       const requestCount = 10000;
       const requests: Promise<void>[] = [];
       let errors = 0;
@@ -182,8 +186,9 @@ describe('Stress Tests: Concurrent Processing', () => {
       // Fire requests as fast as possible
       for (let i = 0; i < requestCount; i++) {
         requests.push(
-          sidecar.processFiles([`virtual-${i}.md`])
-            .catch(() => { errors++; })
+          sidecar.processFiles([`virtual-${i}.md`]).catch(() => {
+            errors++;
+          })
         );
       }
 
@@ -222,7 +227,6 @@ describe('Stress Tests: Concurrent Processing', () => {
         // Should handle without crashing
         expect(stats.peakMemoryMB).toBeLessThan(2000); // Under 2GB
         expect(sidecar.isAlive()).toBe(true);
-
       } finally {
         // Cleanup
         for (const file of bigFiles) {
@@ -248,7 +252,7 @@ describe('Stress Tests: Concurrent Processing', () => {
       }
 
       // Wait for memory to stabilize
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const finalMemory = process.memoryUsage().heapUsed / (1024 * 1024);
       const memoryLeak = finalMemory - initialMemory;
@@ -290,7 +294,7 @@ describe('Stress Tests: Concurrent Processing', () => {
       await sidecar.start();
 
       const batch = Array.from({ length: 100 }, (_, i) => `file-${i}.md`);
-      
+
       // Simulate some files causing errors
       const results: Array<{ success: boolean; error?: Error }> = [];
 
@@ -307,8 +311,8 @@ describe('Stress Tests: Concurrent Processing', () => {
         }
       }
 
-      const successCount = results.filter(r => r.success).length;
-      const failureCount = results.filter(r => !r.success).length;
+      const successCount = results.filter((r) => r.success).length;
+      const failureCount = results.filter((r) => !r.success).length;
 
       // Most files should succeed
       expect(successCount).toBeGreaterThan(batch.length * 0.85);
@@ -328,7 +332,7 @@ describe('Stress Tests: Concurrent Processing', () => {
         for (let i = 0; i < maxFiles; i++) {
           const file = await generateLargeFile(1);
           files.push(file);
-          
+
           // Try to keep file handles open
           try {
             const handle = await fs.open(file, 'r');
@@ -342,7 +346,6 @@ describe('Stress Tests: Concurrent Processing', () => {
         // Should still be able to process files
         await sidecar.processFiles(files.slice(0, 10));
         expect(sidecar.isAlive()).toBe(true);
-
       } finally {
         // Cleanup
         for (const handle of handles) {
@@ -361,19 +364,21 @@ describe('Stress Tests: Concurrent Processing', () => {
 
       // Simulate potential deadlock scenario
       const promises: Promise<void>[] = [];
-      
+
       // Create circular dependency simulation
       for (let i = 0; i < 10; i++) {
-        promises.push((async () => {
-          // Each task depends on the next one (circular)
-          const nextIndex = (i + 1) % 10;
-          await new Promise(resolve => setTimeout(resolve, 100));
-          await sidecar.processFiles([`file-${i}.md`, `file-${nextIndex}.md`]);
-        })());
+        promises.push(
+          (async () => {
+            // Each task depends on the next one (circular)
+            const nextIndex = (i + 1) % 10;
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            await sidecar.processFiles([`file-${i}.md`, `file-${nextIndex}.md`]);
+          })()
+        );
       }
 
       // Should complete without hanging
-      const timeout = new Promise((_, reject) => 
+      const timeout = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Deadlock detected')), 5000)
       );
 
@@ -394,7 +399,9 @@ describe('Stress Tests: System Limits', () => {
     const totalMemory = os.totalmem() / (1024 * 1024 * 1024); // GB
     const freeMemory = os.freemem() / (1024 * 1024 * 1024); // GB
 
-    console.log(`System: ${cpuCount} CPUs, ${totalMemory.toFixed(1)}GB total, ${freeMemory.toFixed(1)}GB free`);
+    console.log(
+      `System: ${cpuCount} CPUs, ${totalMemory.toFixed(1)}GB total, ${freeMemory.toFixed(1)}GB free`
+    );
 
     // Test should adapt to system resources
     const maxWorkers = Math.min(cpuCount * 2, 16);
@@ -408,7 +415,7 @@ describe('Stress Tests: System Limits', () => {
     const batchSize = Math.max(10, Math.floor(fileCount / maxWorkers));
 
     const start = performance.now();
-    
+
     for (let i = 0; i < fileCount; i += batchSize) {
       const batch = Array.from(
         { length: Math.min(batchSize, fileCount - i) },

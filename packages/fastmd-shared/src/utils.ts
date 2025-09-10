@@ -7,7 +7,7 @@ import type { RpcError, RpcId, RpcRequest, RpcResponse } from './protocol.js';
 /**
  * Create an RPC request object
  */
-export function createRpcRequest(id: RpcId, method: string, params?: any): RpcRequest {
+export function createRpcRequest(id: RpcId, method: string, params?: unknown): RpcRequest {
   return {
     jsonrpc: '2.0',
     id,
@@ -19,7 +19,7 @@ export function createRpcRequest(id: RpcId, method: string, params?: any): RpcRe
 /**
  * Create an RPC response object
  */
-export function createRpcResponse(id: RpcId, result?: any, error?: RpcError): RpcResponse {
+export function createRpcResponse(id: RpcId, result?: unknown, error?: RpcError): RpcResponse {
   const response: RpcResponse = {
     jsonrpc: '2.0',
     id
@@ -37,14 +37,14 @@ export function createRpcResponse(id: RpcId, result?: any, error?: RpcError): Rp
 /**
  * Create an RPC error object
  */
-export function createRpcError(code: number, message: string, data?: any): RpcError {
+export function createRpcError(code: number, message: string, data?: unknown): RpcError {
   return { code, message, data };
 }
 
 /**
  * Parse NDJSON line
  */
-export function parseNdjsonLine(line: string): any {
+export function parseNdjsonLine(line: string): unknown {
   try {
     return JSON.parse(line);
   } catch (err) {
@@ -55,7 +55,7 @@ export function parseNdjsonLine(line: string): any {
 /**
  * Stringify to NDJSON line
  */
-export function stringifyNdjsonLine(obj: any): string {
+export function stringifyNdjsonLine(obj: unknown): string {
   return `${JSON.stringify(obj)}\n`;
 }
 
@@ -117,12 +117,12 @@ export function generateRequestId(): string {
 export interface Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
-  reject: (reason?: any) => void;
+  reject: (reason?: unknown) => void;
 }
 
 export function createDeferred<T>(): Deferred<T> {
-  let resolve: (value: T) => void;
-  let reject: (reason?: any) => void;
+  let resolve: (value: T) => void = () => {};
+  let reject: (reason?: unknown) => void = () => {};
 
   const promise = new Promise<T>((res, rej) => {
     resolve = res;
@@ -131,7 +131,7 @@ export function createDeferred<T>(): Deferred<T> {
 
   return {
     promise,
-    resolve: resolve!,
-    reject: reject!
+    resolve,
+    reject
   };
 }
