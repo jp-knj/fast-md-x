@@ -52,7 +52,9 @@ function createMockAstroConfig(): AstroConfig {
 }
 
 // Helper to create mock setup hook params
-function createMockSetupHookParams(overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:config:setup']>[0]>) {
+function createMockSetupHookParams(
+  overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:config:setup']>[0]>
+) {
   return {
     config: createMockAstroConfig(),
     updateConfig: mock(() => createMockAstroConfig()),
@@ -72,7 +74,9 @@ function createMockSetupHookParams(overrides?: Partial<Parameters<NonNullable<As
 }
 
 // Helper to create mock config:done hook params
-function createMockConfigDoneParams(overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:config:done']>[0]>) {
+function createMockConfigDoneParams(
+  overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:config:done']>[0]>
+) {
   return {
     config: createMockAstroConfig(),
     setAdapter: mock(() => {}),
@@ -84,9 +88,11 @@ function createMockConfigDoneParams(overrides?: Partial<Parameters<NonNullable<A
 }
 
 // Helper to create mock server:setup hook params
-function createMockServerSetupParams(overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:server:setup']>[0]>) {
+function createMockServerSetupParams(
+  overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:server:setup']>[0]>
+) {
   return {
-    server: {} as any,
+    server: {} as unknown,
     logger: createInlineMockLogger() as unknown as AstroIntegrationLogger,
     toolbar: {
       send: mock(() => {}),
@@ -95,7 +101,7 @@ function createMockServerSetupParams(overrides?: Partial<Parameters<NonNullable<
       onAppToggled: mock(() => {})
     },
     ...overrides
-  };
+  } as Parameters<NonNullable<AstroIntegration['hooks']>['astro:server:setup']>[0];
 }
 
 describe('Unit: Hook Function Behavior', () => {
@@ -110,18 +116,20 @@ describe('Unit: Hook Function Behavior', () => {
 
     const mockUpdateConfig = mock((config: Partial<AstroConfig>) => {
       expect(config.markdown).toBeDefined();
-      expect(config.markdown!.remarkPlugins).toBeDefined();
-      expect(Array.isArray(config.markdown!.remarkPlugins)).toBe(true);
+      expect(config.markdown?.remarkPlugins).toBeDefined();
+      expect(Array.isArray(config.markdown?.remarkPlugins)).toBe(true);
       return createMockAstroConfig();
     });
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: mockConfig as unknown as AstroConfig,
-        updateConfig: mockUpdateConfig,
-        addWatchFile: mock(() => {}),
-        logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: mockConfig as unknown as AstroConfig,
+          updateConfig: mockUpdateConfig,
+          addWatchFile: mock(() => {}),
+          logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
@@ -139,18 +147,20 @@ describe('Unit: Hook Function Behavior', () => {
 
     const mockUpdateConfig = mock((config: Partial<AstroConfig>) => {
       expect(config.vite).toBeDefined();
-      expect(config.vite!.plugins).toBeDefined();
-      expect(Array.isArray(config.vite!.plugins)).toBe(true);
+      expect(config.vite?.plugins).toBeDefined();
+      expect(Array.isArray(config.vite?.plugins)).toBe(true);
       return createMockAstroConfig();
     });
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: mockConfig as unknown as AstroConfig,
-        updateConfig: mockUpdateConfig,
-        addWatchFile: mock(() => {}),
-        logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: mockConfig as unknown as AstroConfig,
+          updateConfig: mockUpdateConfig,
+          addWatchFile: mock(() => {}),
+          logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
@@ -188,7 +198,6 @@ describe('Unit: Hook Function Behavior', () => {
   });
 
   test('build:done hook should call vite plugin buildEnd if available', async () => {
-
     // We need to test the internal behavior, but since the vitePlugin is private,
     // we'll test the overall behavior through the integration
     const integration = fastMdTransformIntegration();
@@ -250,11 +259,13 @@ describe('Unit: Options Validation and Processing', () => {
     const mockUpdateConfig = mock(() => createMockAstroConfig());
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: { markdown: {}, vite: {} } as unknown as AstroConfig,
-        updateConfig: mockUpdateConfig,
-        logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: { markdown: {}, vite: {} } as unknown as AstroConfig,
+          updateConfig: mockUpdateConfig,
+          logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
@@ -288,11 +299,13 @@ describe('Unit: Logger Interactions', () => {
     const setupHook = integration.hooks?.['astro:config:setup'];
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: { markdown: {}, vite: {} } as unknown as AstroConfig,
-        updateConfig: mock(() => {}),
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: { markdown: {}, vite: {} } as unknown as AstroConfig,
+          updateConfig: mock(() => createMockAstroConfig()),
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(logMessages).toContain('Setting up Fast MD Transform integration');
@@ -319,20 +332,23 @@ describe('Unit: Logger Interactions', () => {
     // Test config:done
     const configDoneHook = integration.hooks?.['astro:config:done'];
     if (configDoneHook) {
-      await configDoneHook(createMockConfigDoneParams({
-        config: {} as unknown as AstroConfig,
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await configDoneHook(
+        createMockConfigDoneParams({
+          config: {} as unknown as AstroConfig,
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
     expect(logMessages).toContain('Fast MD Transform integration configured');
 
     // Test server:setup
     const serverSetupHook = integration.hooks?.['astro:server:setup'];
     if (serverSetupHook) {
-      await serverSetupHook(createMockServerSetupParams({
-        server: {} as any,
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await serverSetupHook(
+        createMockServerSetupParams({
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
     expect(logMessages).toContain('Fast MD Transform ready for development');
 
@@ -350,7 +366,9 @@ describe('Unit: Logger Interactions', () => {
     if (buildDoneHook) {
       await buildDoneHook({
         dir: new URL('file:///test/dist/'),
-        routes: [{ pathname: '/page1' }, { pathname: '/page2' }] as any[],
+        routes: [{ pathname: '/page1' }, { pathname: '/page2' }] as unknown as Parameters<
+          typeof buildDoneHook
+        >[0]['routes'],
         logger: mockLogger as unknown as AstroIntegrationLogger,
         pages: [],
         assets: new Map()
@@ -388,11 +406,13 @@ describe('Unit: Plugin Creation and Registration', () => {
     });
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: { markdown: {}, vite: {} } as unknown as AstroConfig,
-        updateConfig: mockUpdateConfig,
-        logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: { markdown: {}, vite: {} } as unknown as AstroConfig,
+          updateConfig: mockUpdateConfig,
+          logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(capturedRemarkPlugin).toBeDefined();
@@ -417,11 +437,13 @@ describe('Unit: Plugin Creation and Registration', () => {
     });
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: { markdown: {}, vite: {} } as unknown as AstroConfig,
-        updateConfig: mockUpdateConfig,
-        logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: { markdown: {}, vite: {} } as unknown as AstroConfig,
+          updateConfig: mockUpdateConfig,
+          logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(capturedVitePlugin).toBeDefined();
@@ -439,11 +461,13 @@ describe('Unit: Command and Restart Handling', () => {
 
     if (setupHook) {
       // Execute the hook and verify it doesn't throw
-      await setupHook(createMockSetupHookParams({
-        config: { markdown: {}, vite: {} } as unknown as AstroConfig,
-        updateConfig: mockUpdateConfig,
-        logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: { markdown: {}, vite: {} } as unknown as AstroConfig,
+          updateConfig: mockUpdateConfig,
+          logger: createInlineMockLogger() as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
@@ -457,12 +481,14 @@ describe('Unit: Command and Restart Handling', () => {
 
     if (setupHook) {
       // Execute the hook and verify it doesn't throw
-      await setupHook(createMockSetupHookParams({
-        config: { markdown: {}, vite: {} } as unknown as AstroConfig,
-        updateConfig: mockUpdateConfig,
-        logger: createInlineMockLogger() as unknown as AstroIntegrationLogger,
-        command: 'build'
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: { markdown: {}, vite: {} } as unknown as AstroConfig,
+          updateConfig: mockUpdateConfig,
+          logger: createInlineMockLogger() as unknown as AstroIntegrationLogger,
+          command: 'build'
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
@@ -476,12 +502,14 @@ describe('Unit: Command and Restart Handling', () => {
 
     if (setupHook) {
       // Execute the hook and verify it doesn't throw
-      await setupHook(createMockSetupHookParams({
-        config: { markdown: {}, vite: {} } as unknown as AstroConfig,
-        updateConfig: mockUpdateConfig,
-        logger: createInlineMockLogger() as unknown as AstroIntegrationLogger,
-        isRestart: true
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: { markdown: {}, vite: {} } as unknown as AstroConfig,
+          updateConfig: mockUpdateConfig,
+          logger: createInlineMockLogger() as unknown as AstroIntegrationLogger,
+          isRestart: true
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();

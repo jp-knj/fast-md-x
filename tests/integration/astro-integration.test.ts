@@ -9,7 +9,12 @@
  * - Properly manages lifecycle hooks
  */
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
-import type { AstroConfig, AstroIntegration, AstroIntegrationLogger } from 'astro';
+import type {
+  AstroConfig,
+  AstroIntegration,
+  AstroIntegrationLogger,
+  IntegrationRouteData
+} from 'astro';
 import { fastMdTransformIntegration } from '../../packages/fastmd-plugin-transform/dist/astro-integration';
 import type { MockLogger } from '../test-types';
 
@@ -28,7 +33,9 @@ function createMockLogger(): MockLogger {
 }
 
 // Helper to create mock setup hook params
-function createMockSetupHookParams(overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:config:setup']>[0]>) {
+function createMockSetupHookParams(
+  overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:config:setup']>[0]>
+) {
   return {
     config: createMockAstroConfig(),
     updateConfig: mock(() => createMockAstroConfig()),
@@ -48,7 +55,9 @@ function createMockSetupHookParams(overrides?: Partial<Parameters<NonNullable<As
 }
 
 // Helper to create mock config:done hook params
-function createMockConfigDoneParams(overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:config:done']>[0]>) {
+function createMockConfigDoneParams(
+  overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:config:done']>[0]>
+) {
   return {
     config: createMockAstroConfig(),
     setAdapter: mock(() => {}),
@@ -59,8 +68,10 @@ function createMockConfigDoneParams(overrides?: Partial<Parameters<NonNullable<A
   };
 }
 
-// Helper to create mock build:start hook params  
-function createMockBuildStartParams(overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:build:start']>[0]>) {
+// Helper to create mock build:start hook params
+function createMockBuildStartParams(
+  overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:build:start']>[0]>
+) {
   return {
     logger: createMockLogger() as unknown as AstroIntegrationLogger,
     ...overrides
@@ -68,7 +79,9 @@ function createMockBuildStartParams(overrides?: Partial<Parameters<NonNullable<A
 }
 
 // Helper to create mock build:done hook params
-function createMockBuildDoneParams(overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:build:done']>[0]>) {
+function createMockBuildDoneParams(
+  overrides?: Partial<Parameters<NonNullable<AstroIntegration['hooks']>['astro:build:done']>[0]>
+) {
   return {
     dir: new URL('file:///test/dist/'),
     routes: [],
@@ -164,12 +177,14 @@ describe('Astro Integration: Config Setup Hook', () => {
     const setupHook = integration.hooks?.['astro:config:setup'];
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: astroConfig,
-        updateConfig: mockUpdateConfig,
-        addWatchFile: mockAddWatchFile,
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: astroConfig,
+          updateConfig: mockUpdateConfig,
+          addWatchFile: mockAddWatchFile,
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
@@ -187,12 +202,14 @@ describe('Astro Integration: Config Setup Hook', () => {
     const setupHook = integration.hooks?.['astro:config:setup'];
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: astroConfig,
-        updateConfig: mockUpdateConfig,
-        addWatchFile: mockAddWatchFile,
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: astroConfig,
+          updateConfig: mockUpdateConfig,
+          addWatchFile: mockAddWatchFile,
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
@@ -223,12 +240,14 @@ describe('Astro Integration: Config Setup Hook', () => {
     const setupHook = integration.hooks?.['astro:config:setup'];
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: astroConfig,
-        updateConfig: mockUpdateConfig,
-        addWatchFile: mockAddWatchFile,
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: astroConfig,
+          updateConfig: mockUpdateConfig,
+          addWatchFile: mockAddWatchFile,
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockLogger.info).toHaveBeenCalledWith('Setting up Fast MD Transform integration');
@@ -252,12 +271,14 @@ describe('Astro Integration: Config Setup Hook', () => {
     const setupHook = integration.hooks?.['astro:config:setup'];
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: astroConfig,
-        updateConfig: mockUpdateConfig,
-        addWatchFile: mockAddWatchFile,
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: astroConfig,
+          updateConfig: mockUpdateConfig,
+          addWatchFile: mockAddWatchFile,
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     const updateCall = mockUpdateConfig.mock.calls[0];
@@ -281,10 +302,12 @@ describe('Astro Integration: Build Lifecycle Hooks', () => {
     const configDoneHook = integration.hooks?.['astro:config:done'];
 
     if (configDoneHook) {
-      await configDoneHook(createMockConfigDoneParams({
-        config: createMockAstroConfig(),
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await configDoneHook(
+        createMockConfigDoneParams({
+          config: createMockAstroConfig(),
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockLogger.info).toHaveBeenCalledWith('Fast MD Transform integration configured');
@@ -309,10 +332,10 @@ describe('Astro Integration: Build Lifecycle Hooks', () => {
         close: async () => {},
         listen: async () => {},
         restart: async () => {}
-      } as any;
+      } as unknown;
 
       await serverSetupHook({
-        server: mockServer,
+        server: mockServer as Parameters<typeof serverSetupHook>[0]['server'],
         logger: mockLogger as unknown as AstroIntegrationLogger,
         toolbar: {
           send: () => {},
@@ -331,9 +354,11 @@ describe('Astro Integration: Build Lifecycle Hooks', () => {
     const buildStartHook = integration.hooks?.['astro:build:start'];
 
     if (buildStartHook) {
-      await buildStartHook(createMockBuildStartParams({
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await buildStartHook(
+        createMockBuildStartParams({
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockLogger.info).toHaveBeenCalledWith(
@@ -379,16 +404,18 @@ describe('Astro Integration: Build Lifecycle Hooks', () => {
         route: '/page3',
         generate: () => []
       }
-    ] as any[];
+    ] as unknown as IntegrationRouteData[];
 
     if (buildDoneHook) {
-      await buildDoneHook(createMockBuildDoneParams({
-        dir: new URL('file:///test/dist/'),
-        routes: mockRoutes,
-        logger: mockLogger as unknown as AstroIntegrationLogger,
-        pages: [],
-        assets: new Map()
-      }));
+      await buildDoneHook(
+        createMockBuildDoneParams({
+          dir: new URL('file:///test/dist/'),
+          routes: mockRoutes,
+          logger: mockLogger as unknown as AstroIntegrationLogger,
+          pages: [],
+          assets: new Map()
+        })
+      );
     }
 
     expect(mockLogger.info).toHaveBeenCalledWith('Fast MD Transform processed 3 routes');
@@ -409,12 +436,14 @@ describe('Astro Integration: Engine Mode Configuration', () => {
     const setupHook = integration.hooks?.['astro:config:setup'];
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: createMockAstroConfig(),
-        updateConfig: mockUpdateConfig,
-        addWatchFile: mock(() => {}),
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: createMockAstroConfig(),
+          updateConfig: mockUpdateConfig,
+          addWatchFile: mock(() => {}),
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockLogger.info).toHaveBeenCalledWith('Engine: js');
@@ -428,12 +457,14 @@ describe('Astro Integration: Engine Mode Configuration', () => {
     const setupHook = integration.hooks?.['astro:config:setup'];
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: createMockAstroConfig(),
-        updateConfig: mockUpdateConfig,
-        addWatchFile: mock(() => {}),
-        logger: mockLogger as unknown as AstroIntegrationLogger
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: createMockAstroConfig(),
+          updateConfig: mockUpdateConfig,
+          addWatchFile: mock(() => {}),
+          logger: mockLogger as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockLogger.info).toHaveBeenCalledWith('Engine: native');
@@ -452,12 +483,14 @@ describe('Astro Integration: Engine Mode Configuration', () => {
       const setupHook = integration.hooks?.['astro:config:setup'];
 
       if (setupHook) {
-        await setupHook(createMockSetupHookParams({
-          config: createMockAstroConfig(),
-          updateConfig: mockUpdateConfig,
-          addWatchFile: mock(() => {}),
-          logger: mockLogger as unknown as AstroIntegrationLogger
-        }));
+        await setupHook(
+          createMockSetupHookParams({
+            config: createMockAstroConfig(),
+            updateConfig: mockUpdateConfig,
+            addWatchFile: mock(() => {}),
+            logger: mockLogger as unknown as AstroIntegrationLogger
+          })
+        );
       }
 
       expect(mockLogger.info).toHaveBeenCalledWith('Engine: native');
@@ -493,12 +526,14 @@ describe('Astro Integration: Custom Rules Configuration', () => {
     }));
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: createMockAstroConfig(),
-        updateConfig: mockUpdateConfig as any,
-        addWatchFile: mock(() => {}),
-        logger: createMockLogger() as unknown as AstroIntegrationLogger,
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: createMockAstroConfig(),
+          updateConfig: mockUpdateConfig as unknown as typeof mockUpdateConfig,
+          addWatchFile: mock(() => {}),
+          logger: createMockLogger() as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
@@ -515,12 +550,14 @@ describe('Astro Integration: Custom Rules Configuration', () => {
     }));
 
     if (setupHook) {
-      await setupHook(createMockSetupHookParams({
-        config: createMockAstroConfig(),
-        updateConfig: mockUpdateConfig as any,
-        addWatchFile: mock(() => {}),
-        logger: createMockLogger() as unknown as AstroIntegrationLogger,
-      }));
+      await setupHook(
+        createMockSetupHookParams({
+          config: createMockAstroConfig(),
+          updateConfig: mockUpdateConfig as unknown as typeof mockUpdateConfig,
+          addWatchFile: mock(() => {}),
+          logger: createMockLogger() as unknown as AstroIntegrationLogger
+        })
+      );
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
