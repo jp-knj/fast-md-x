@@ -2,6 +2,9 @@ use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+mod markdown_transform;
+pub use markdown_transform::*;
+
 #[derive(Serialize, Deserialize)]
 pub struct FileMetadata {
     pub path: String,

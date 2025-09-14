@@ -14,16 +14,19 @@ The transform plugin handles engine selection and Markdown processing:
 
 ```typescript
 interface FastMdTransformOptions {
-  // Transformation engine
-  engine?: 'sidecar' | 'wasm' | 'off';
+  // Transformation engine mode
+  engine?: 'native' | 'js';
+  
+  // Native engine type (when engine is 'native')
+  nativeType?: 'sidecar' | 'wasm';
   
   // Path to sidecar binary
   sidecarPath?: string;
   
-  // Logging level for sidecar
+  // Logging level
   logLevel?: 'silent' | 'info' | 'debug' | 'trace';
   
-  // Cache directory for sidecar
+  // Cache directory
   cacheDir?: string;
   
   // Include patterns (glob)
@@ -31,6 +34,36 @@ interface FastMdTransformOptions {
   
   // Exclude patterns (glob)
   exclude?: string[];
+  
+  // Custom transformation rules
+  customRules?: CustomTransformRule[];
+  
+  // Transformation hooks
+  hooks?: {
+    beforeTransform?: (context: TransformContext) => void | Promise<void>;
+    afterTransform?: (context: TransformContext & { output: string }) => string | Promise<string>;
+  };
+  
+  // External processors
+  processors?: {
+    remark?: any[];
+    rehype?: any[];
+  };
+}
+```
+
+#### Custom Transformation Rules
+
+Define custom rules to transform content:
+
+```typescript
+interface CustomTransformRule {
+  name: string;
+  pattern?: RegExp | string;
+  transform: (content: string, context: TransformContext) => string | Promise<string>;
+  priority?: number;
+  stage?: 'pre' | 'post';
+  enabled?: boolean;
 }
 ```
 
@@ -117,13 +150,111 @@ fastmdTransform({
 })
 ```
 
+### Engine Modes
+
+#### Native Mode (High Performance)
+
+Use native Rust-based engines for maximum performance:
+
+```javascript
+fastmdTransform({
+  engine: 'native',
+  nativeType: 'wasm'  // or 'sidecar'
+})
+```
+
+- **WASM**: WebAssembly module, works in browser and Node.js
+- **Sidecar**: External process, best for server environments
+
+#### JS Mode (Compatibility)
+
+Use JavaScript-based processing for maximum compatibility:
+
+```javascript
+fastmdTransform({
+  engine: 'js',
+  processors: {
+    remark: [remarkGfm, remarkToc],
+    rehype: [rehypeSlug, rehypeAutolinkHeadings]
+  }
+})
+```
+
+### Custom Transformation Rules
+
+Add custom rules to transform your content:
+
+```javascript
+import { builtInRules } from '@fastmd/plugin-transform/transform-pipeline';
+
+fastmdTransform({
+  customRules: [
+    // Simple pattern replacement
+    builtInRules.patternReplace(
+      'emoji-arrows',
+      /-->/g,
+      '→',
+      { stage: 'pre', priority: 1 }
+    ),
+    
+    // Custom function
+    builtInRules.customFunction(
+      'add-reading-time',
+      (content, context) => {
+        const words = content.split(/\s+/).length;
+        const readingTime = Math.ceil(words / 200);
+        context.metadata.readingTime = readingTime;
+        return content;
+      },
+      { stage: 'pre' }
+    ),
+    
+    // Conditional rule
+    {
+      name: 'draft-warning',
+      stage: 'post',
+      transform: (html, context) => {
+        if (context.frontmatter?.draft) {
+          return `<div class="draft-warning">⚠️ Draft Content</div>\n${html}`;
+        }
+        return html;
+      }
+    }
+  ]
+})
+```
+
+### Transformation Hooks
+
+Hooks provide additional control over the transformation process:
+
+```javascript
+fastmdTransform({
+  hooks: {
+    beforeTransform: async (context) => {
+      console.log(`Processing: ${context.filepath}`);
+      // Modify context before transformation
+    },
+    
+    afterTransform: async (context) => {
+      // Modify output after transformation
+      if (context.frontmatter?.toc) {
+        return addTableOfContents(context.output);
+      }
+      return context.output;
+    }
+  }
+})
+```
+
 ### Custom Sidecar Path
 
 Use a custom-built sidecar binary:
 
 ```javascript
 fastmdTransform({
-  engine: 'sidecar',
+  engine: 'native',
+  nativeType: 'sidecar',
   sidecarPath: './bin/fastmd-sidecar',
   logLevel: 'debug'
 })
@@ -142,8 +273,9 @@ export default defineConfig({
   vite: {
     plugins: [
       fastmdTransform({
-        // Use sidecar in production, off in development
-        engine: isDev ? 'off' : 'sidecar',
+        // Use native in production, JS in development
+        engine: isDev ? 'js' : 'native',
+        nativeType: 'wasm',
         
         // Verbose logging in CI
         logLevel: isCI ? 'trace' : 'info'
@@ -158,6 +290,21 @@ export default defineConfig({
     ]
   }
 });
+```
+
+### Environment Variables
+
+Control the plugin behavior via environment variables:
+
+```bash
+# Enable native mode
+FASTMD_NATIVE=1
+
+# Choose native type (wasm or sidecar)
+FASTMD_NATIVE_TYPE=wasm
+
+# Set engine directly
+FASTMD_ENGINE=native
 ```
 
 ### Performance Tuning

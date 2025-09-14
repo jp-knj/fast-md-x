@@ -75,19 +75,26 @@ const digest = await __internals.computeDepsDigest(files);
 
 ## Transform API
 
-### Transform Function
+### Transform Plugin
 
-The transform plugin processes Markdown/MDX content:
+The transform plugin processes Markdown/MDX content with multiple engine options:
 
 ```typescript
-interface TransformRequest {
-  file: string;
+interface TransformContext {
+  filepath: string;
   content: string;
-  options?: {
-    mode?: 'development' | 'production';
-    sourcemap?: boolean;
-    framework?: 'astro' | 'vite';
-  };
+  frontmatter?: Record<string, any>;
+  mode?: 'development' | 'production';
+  metadata?: Record<string, any>;
+}
+
+interface CustomTransformRule {
+  name: string;
+  pattern?: RegExp | string;
+  transform: (content: string, context: TransformContext) => string | Promise<string>;
+  priority?: number;
+  stage?: 'pre' | 'post';
+  enabled?: boolean;
 }
 
 interface TransformResponse {
@@ -97,25 +104,128 @@ interface TransformResponse {
     frontmatter?: Record<string, any>;
     imports?: string[];
     exports?: string[];
+    wordCount?: number;
+    headingCount?: number;
   };
   dependencies?: string[];
 }
 ```
 
-### Usage Example
+### Custom Rules API
 
-```javascript
-// Direct transformation (not recommended)
-const client = new SidecarClient({ engine: 'sidecar' });
-await client.start();
+#### Built-in Rule Factories
 
-const result = await client.transform(
-  '/src/content/post.md',
-  '# Hello World',
-  { mode: 'production' }
+```typescript
+import { builtInRules, ruleComposition } from '@fastmd/plugin-transform/transform-pipeline';
+
+// Pattern-based replacement
+const emojiRule = builtInRules.patternReplace(
+  'emoji',
+  /:smile:/g,
+  '😀'
 );
 
-console.log(result.code); // Transformed HTML/JSX
+// Custom function
+const customRule = builtInRules.customFunction(
+  'custom',
+  async (content, context) => {
+    // Transform logic
+    return modifiedContent;
+  }
+);
+
+// Chain multiple rules
+const chainedRule = ruleComposition.chain(
+  'chained',
+  [rule1, rule2, rule3]
+);
+
+// Conditional execution
+const conditionalRule = ruleComposition.conditional(
+  'conditional',
+  (context) => context.frontmatter?.beta === true,
+  betaFeatureRule
+);
+```
+
+### Transform Pipeline
+
+```typescript
+import { TransformPipeline } from '@fastmd/plugin-transform/transform-pipeline';
+
+const pipeline = new TransformPipeline();
+
+// Add rules
+pipeline.addRule({
+  name: 'my-rule',
+  stage: 'pre',
+  transform: (content) => content.toUpperCase()
+});
+
+// Execute transformation
+const result = await pipeline.executeStage(
+  content,
+  context,
+  'pre'
+);
+```
+
+### Usage Examples
+
+#### With Native Engine (WASM)
+
+```javascript
+import fastmdTransform from '@fastmd/plugin-transform';
+
+export default {
+  plugins: [
+    fastmdTransform({
+      engine: 'native',
+      nativeType: 'wasm',
+      customRules: [
+        {
+          name: 'github-alerts',
+          pattern: /^> \[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/gm,
+          stage: 'pre',
+          transform: (content) => {
+            // Convert GitHub-style alerts to HTML
+            return content.replace(
+              /^> \[!(\w+)\](.*)$/gm,
+              '<div class="alert alert-$1">$2</div>'
+            );
+          }
+        }
+      ]
+    })
+  ]
+};
+```
+
+#### With JS Engine and Processors
+
+```javascript
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+
+export default {
+  plugins: [
+    fastmdTransform({
+      engine: 'js',
+      processors: {
+        remark: [remarkGfm],
+        rehype: [rehypeHighlight]
+      },
+      hooks: {
+        afterTransform: async ({ output, frontmatter }) => {
+          if (frontmatter?.layout) {
+            return wrapWithLayout(output, frontmatter.layout);
+          }
+          return output;
+        }
+      }
+    })
+  ]
+};
 ```
 
 ## RPC Protocol
