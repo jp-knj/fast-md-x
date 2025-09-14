@@ -11,23 +11,13 @@ export default defineConfig({
       // Use native mode if FASTMD_NATIVE is set
       engine: process.env.FASTMD_NATIVE === '1' ? 'native' : 'js',
       nativeType: process.env.FASTMD_NATIVE_TYPE || 'wasm',
-      
+
       // Custom transformation rules (JS execution for now)
       customRules: [
         // Simple arrow replacement rule
-        builtInRules.patternReplace(
-          'arrow-replacer',
-          /-->/g,
-          '→',
-          { stage: 'pre', priority: 1 }
-        ),
+        builtInRules.patternReplace('arrow-replacer', /-->/g, '→', { stage: 'pre', priority: 1 }),
         // Double arrow replacement
-        builtInRules.patternReplace(
-          'double-arrow',
-          /==>/g,
-          '⇨',
-          { stage: 'pre', priority: 1 }
-        ),
+        builtInRules.patternReplace('double-arrow', /==>/g, '⇨', { stage: 'pre', priority: 1 }),
         // Custom test rule
         {
           name: 'test-custom-rule',
@@ -39,7 +29,7 @@ export default defineConfig({
           }
         }
       ],
-      
+
       // Hooks for additional processing
       hooks: {
         beforeTransform: async (context) => {
@@ -50,12 +40,12 @@ export default defineConfig({
           return context.output;
         }
       },
-      
+
       sidecarPath: './engines/sidecar/target/release/fastmd-sidecar',
       logLevel: 'info'
     })
   ],
-  
+
   vite: {
     plugins: [
       // Cache layer (3-10x speedup on cache hits)

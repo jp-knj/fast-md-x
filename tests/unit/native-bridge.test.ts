@@ -62,13 +62,13 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
     const prevEnv = { ...process.env };
     process.env.FASTMD_NATIVE = '1';
     process.env.FASTMD_NATIVE_MODULE = modPath;
-    
+
     // Clear require cache to ensure fresh import
     delete require.cache[modPath];
-    
+
     const m = await import('../../packages/fastmd-cache/native-bridge.mjs');
     const stub = m.loadFastmdNative();
-    
+
     // If stub is not null, it means it fell back to a real module
     // In that case, check that depsDigestNative still returns null for bad input
     if (stub && (stub.deps_digest || stub.normalize_content)) {
@@ -82,7 +82,7 @@ describe('native-bridge: FASTMD_NATIVE_MODULE injection', () => {
       const res = m.depsDigestNative(['x'], undefined as unknown as unknown);
       expect(res).toBeNull();
     }
-    
+
     process.env = prevEnv;
   });
 

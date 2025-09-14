@@ -19,9 +19,9 @@ export type NativeType = 'sidecar' | 'wasm';
 export interface TransformContext {
   filepath: string;
   content: string;
-  frontmatter?: Record<string, any>;
+  frontmatter?: Record<string, unknown>;
   mode?: 'development' | 'production';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CustomTransformRule {
@@ -40,7 +40,7 @@ export interface TransformHooks {
 
 export interface FastMdTransformOptions {
   engine?: EngineMode;
-  nativeType?: NativeType;  // Type of native engine (default: 'wasm')
+  nativeType?: NativeType; // Type of native engine (default: 'wasm')
   sidecarPath?: string;
   logLevel?: 'silent' | 'info' | 'debug' | 'trace';
   cacheDir?: string;
@@ -49,8 +49,8 @@ export interface FastMdTransformOptions {
   customRules?: CustomTransformRule[];
   hooks?: TransformHooks;
   processors?: {
-    remark?: any[];
-    rehype?: any[];
+    remark?: unknown[];
+    rehype?: unknown[];
   };
 }
 

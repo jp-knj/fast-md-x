@@ -1,7 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import type { Plugin } from 'vite';
-import matter from 'gray-matter';
 import {
   type Deferred,
   RPC_METHODS,
@@ -13,14 +11,21 @@ import {
   createRpcRequest,
   generateRequestId
 } from '@fastmd/shared';
-import { loadWasmModule, transformMarkdownWasm, unloadWasmModule, isWasmSupported } from './wasm-loader';
-import type { 
-  EngineMode, 
-  NativeType, 
-  FastMdTransformOptions, 
+import matter from 'gray-matter';
+import type { Plugin } from 'vite';
+import type {
   EngineConfig,
-  TransformContext 
+  EngineMode,
+  FastMdTransformOptions,
+  NativeType,
+  TransformContext
 } from './index';
+import {
+  isWasmSupported,
+  loadWasmModule,
+  transformMarkdownWasm,
+  unloadWasmModule
+} from './wasm-loader';
 
 class SidecarClient {
   private process: ChildProcess | null = null;
@@ -133,13 +138,17 @@ class SidecarClient {
     await this.sendRequest('ping');
   }
 
-  async transform(file: string, content: string, options?: any): Promise<TransformResponse> {
+  async transform(
+    file: string,
+    content: string,
+    options?: Record<string, unknown>
+  ): Promise<TransformResponse> {
     const request: TransformRequest = {
       file,
       content,
       options
     };
-    return await this.sendRequest(RPC_METHODS.TRANSFORM, request) as TransformResponse;
+    return (await this.sendRequest(RPC_METHODS.TRANSFORM, request)) as TransformResponse;
   }
 
   async shutdown(): Promise<void> {
@@ -203,7 +212,7 @@ function getEngineConfig(options: FastMdTransformOptions): EngineConfig {
 
 export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
   let client: SidecarClient | null = null;
-  let wasmModule: any = null;
+  let wasmModule: unknown = null;
   let engineConfig: EngineConfig;
 
   return {
@@ -212,7 +221,9 @@ export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
 
     async buildStart() {
       engineConfig = getEngineConfig(options);
-      console.log(`[fastmd-transform] Engine: ${engineConfig.mode}${engineConfig.mode === 'native' ? ` (${engineConfig.nativeType})` : ''}`);
+      console.log(
+        `[fastmd-transform] Engine: ${engineConfig.mode}${engineConfig.mode === 'native' ? ` (${engineConfig.nativeType})` : ''}`
+      );
 
       // Initialize native engine if configured
       if (engineConfig.mode === 'native') {
@@ -228,7 +239,9 @@ export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
           }
         } else if (engineConfig.nativeType === 'wasm') {
           if (!isWasmSupported()) {
-            console.warn('[fastmd-transform] WASM not supported in this environment, falling back to JS');
+            console.warn(
+              '[fastmd-transform] WASM not supported in this environment, falling back to JS'
+            );
             engineConfig.mode = 'js';
           } else {
             try {
@@ -236,7 +249,10 @@ export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
               wasmModule = await loadWasmModule();
               console.log('[fastmd-transform] WASM module loaded successfully');
             } catch (err) {
-              console.warn('[fastmd-transform] Failed to load WASM module, falling back to JS:', err);
+              console.warn(
+                '[fastmd-transform] Failed to load WASM module, falling back to JS:',
+                err
+              );
               engineConfig.mode = 'js';
             }
           }
@@ -264,7 +280,7 @@ export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
 
       // Parse frontmatter
       const { content, data: frontmatter } = matter(code);
-      
+
       // Create transform context
       const mode = this.meta.watchMode ? 'development' : 'production';
       const context: TransformContext = {
@@ -284,9 +300,9 @@ export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
       let processedContent = content;
       if (options.customRules) {
         const preRules = options.customRules
-          .filter(rule => rule.enabled !== false && rule.stage === 'pre')
+          .filter((rule) => rule.enabled !== false && rule.stage === 'pre')
           .sort((a, b) => (a.priority || 0) - (b.priority || 0));
-        
+
         for (const rule of preRules) {
           try {
             processedContent = await rule.transform(processedContent, context);
@@ -316,9 +332,9 @@ export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
           try {
             // Prepare custom rules for WASM if any
             const wasmRules = options.customRules
-              ?.filter(r => r.pattern && typeof r.pattern === 'string')
-              .map(r => ({ 
-                pattern: r.pattern as string, 
+              ?.filter((r) => r.pattern && typeof r.pattern === 'string')
+              .map((r) => ({
+                pattern: r.pattern as string,
                 replacement: 'RULE_OUTPUT' // Simplified for now
               }));
 
@@ -350,9 +366,9 @@ export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
       // Apply post-processing custom rules
       if (options.customRules) {
         const postRules = options.customRules
-          .filter(rule => rule.enabled !== false && (!rule.stage || rule.stage === 'post'))
+          .filter((rule) => rule.enabled !== false && (!rule.stage || rule.stage === 'post'))
           .sort((a, b) => (a.priority || 0) - (b.priority || 0));
-        
+
         for (const rule of postRules) {
           try {
             html = await rule.transform(html, { ...context, content: html });
@@ -364,7 +380,7 @@ export function createVitePlugin(options: FastMdTransformOptions = {}): Plugin {
 
       // Apply afterTransform hook
       if (options.hooks?.afterTransform) {
-        html = await options.hooks.afterTransform({ ...context, output: html }) || html;
+        html = (await options.hooks.afterTransform({ ...context, output: html })) || html;
       }
 
       // Return ESM module with html and frontmatter exports

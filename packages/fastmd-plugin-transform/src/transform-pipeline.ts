@@ -5,7 +5,7 @@ import type { CustomTransformRule, TransformContext } from './index';
  */
 export class TransformPipeline {
   private rules: CustomTransformRule[] = [];
-  
+
   constructor(rules?: CustomTransformRule[]) {
     if (rules) {
       this.addRules(rules);
@@ -33,7 +33,7 @@ export class TransformPipeline {
    */
   removeRule(name: string): boolean {
     const initialLength = this.rules.length;
-    this.rules = this.rules.filter(rule => rule.name !== name);
+    this.rules = this.rules.filter((rule) => rule.name !== name);
     return this.rules.length < initialLength;
   }
 
@@ -48,13 +48,14 @@ export class TransformPipeline {
    * Execute rules for a specific stage
    */
   async executeStage(
-    content: string, 
-    context: TransformContext, 
+    content: string,
+    context: TransformContext,
     stage: 'pre' | 'post'
   ): Promise<string> {
-    const stageRules = this.rules.filter(rule => 
-      rule.enabled !== false && 
-      (stage === 'pre' ? rule.stage === 'pre' : (!rule.stage || rule.stage === 'post'))
+    const stageRules = this.rules.filter(
+      (rule) =>
+        rule.enabled !== false &&
+        (stage === 'pre' ? rule.stage === 'pre' : !rule.stage || rule.stage === 'post')
     );
 
     let result = content;
@@ -74,20 +75,19 @@ export class TransformPipeline {
    * Execute a single transformation rule
    */
   private async executeRule(
-    rule: CustomTransformRule, 
-    content: string, 
+    rule: CustomTransformRule,
+    content: string,
     context: TransformContext
   ): Promise<string> {
     // If rule has a pattern, check if it matches first
     if (rule.pattern) {
-      const pattern = typeof rule.pattern === 'string' 
-        ? new RegExp(rule.pattern, 'g')
-        : rule.pattern;
-      
+      const pattern =
+        typeof rule.pattern === 'string' ? new RegExp(rule.pattern, 'g') : rule.pattern;
+
       if (!pattern.test(content)) {
         return content; // Skip if pattern doesn't match
       }
-      
+
       // Reset regex state for actual transformation
       if (pattern.global) {
         pattern.lastIndex = 0;
@@ -123,14 +123,14 @@ export const builtInRules = {
   patternReplace: (
     name: string,
     pattern: RegExp | string,
-    replacement: string | ((match: string, ...args: any[]) => string),
+    replacement: string | ((match: string, ...args: unknown[]) => string),
     options?: Partial<CustomTransformRule>
   ): CustomTransformRule => ({
     name,
     pattern,
     transform: (content: string) => {
       const regex = typeof pattern === 'string' ? new RegExp(pattern, 'g') : pattern;
-      return typeof replacement === 'string' 
+      return typeof replacement === 'string'
         ? content.replace(regex, replacement)
         : content.replace(regex, replacement);
     },
@@ -155,7 +155,7 @@ export const builtInRules = {
    */
   processor: (
     name: string,
-    processor: any,
+    processor: unknown,
     options?: Partial<CustomTransformRule>
   ): CustomTransformRule => ({
     name,
@@ -226,10 +226,10 @@ export const ruleComposition = {
     transform: async (content: string, context: TransformContext) => {
       const results = await Promise.all(
         rules
-          .filter(rule => rule.enabled !== false)
-          .map(rule => rule.transform(content, context))
+          .filter((rule) => rule.enabled !== false)
+          .map((rule) => rule.transform(content, context))
       );
-      
+
       return selector ? selector(results) : results[results.length - 1];
     },
     ...options

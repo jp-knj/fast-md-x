@@ -31,7 +31,7 @@ export async function loadWasmModule(): Promise<WasmModule> {
 
   // Start loading the module
   loadPromise = loadWasmModuleInternal();
-  
+
   try {
     wasmModule = await loadPromise;
     return wasmModule;
@@ -56,15 +56,21 @@ async function loadWasmModuleInternal(): Promise<WasmModule> {
 
   // Try to load from relative path (for development)
   try {
-    const wasmPath = new URL('../../../native/fastmd-native/pkg/fastmd_native_bg.wasm', import.meta.url);
+    const wasmPath = new URL(
+      '../../../native/fastmd-native/pkg/fastmd_native_bg.wasm',
+      import.meta.url
+    );
     const wasmModule = await import('../../../native/fastmd-native/pkg/fastmd_native.js');
-    
+
     // Initialize the WASM module with the binary
-    const wasmBinary = await fetch(wasmPath).then(r => r.arrayBuffer());
-    if (typeof (wasmModule as any).default === 'function') {
-      await (wasmModule as any).default(wasmBinary);
+    const wasmBinary = await fetch(wasmPath).then((r) => r.arrayBuffer());
+    const wasmModuleWithDefault = wasmModule as {
+      default?: (binary: ArrayBuffer) => Promise<void>;
+    };
+    if (typeof wasmModuleWithDefault.default === 'function') {
+      await wasmModuleWithDefault.default(wasmBinary);
     }
-    
+
     console.log('[WASM Loader] Loaded from local development path');
     return wasmModule as unknown as WasmModule;
   } catch (err) {
@@ -88,7 +94,7 @@ export function isWasmSupported(): boolean {
     const bytes = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
     const module = new WebAssembly.Module(bytes);
     const instance = new WebAssembly.Instance(module);
-    
+
     return instance !== null;
   } catch {
     return false;
@@ -130,9 +136,9 @@ export async function transformMarkdownWasm(
     heading_ids?: boolean;
     xhtml?: boolean;
   }
-): Promise<{ html: string; metadata?: any }> {
+): Promise<{ html: string; metadata?: Record<string, unknown> }> {
   const wasm = await loadWasmModule();
-  
+
   const transformOptions = {
     engine: options?.engine || 'markdown-rs',
     gfm: options?.gfm ?? true,
@@ -142,11 +148,11 @@ export async function transformMarkdownWasm(
     tasklist: options?.tasklist ?? true,
     smart_punctuation: options?.smart_punctuation ?? false,
     heading_ids: options?.heading_ids ?? true,
-    xhtml: options?.xhtml ?? false,
+    xhtml: options?.xhtml ?? false
   };
 
   let result: string;
-  
+
   if (options?.customRules && options.customRules.length > 0) {
     // Use full pipeline with custom rules
     result = wasm.transform_markdown_full(

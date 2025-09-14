@@ -1,25 +1,30 @@
 /// <reference types="bun-types" />
 /**
  * Integration tests for @fastmd/plugin-transform Astro Integration
- * 
+ *
  * Tests verify that the Astro Integration properly:
  * - Registers with Astro's configuration system
  * - Adds remark plugins to the markdown pipeline
  * - Handles different engine modes (js/native)
  * - Properly manages lifecycle hooks
  */
-import { describe, expect, test, beforeEach, mock } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import type { AstroConfig } from 'astro';
 import { fastMdTransformIntegration } from '../../packages/fastmd-plugin-transform/dist/astro-integration.js';
-import type { AstroIntegration, AstroConfig } from 'astro';
+import type { MockLogger } from '../test-types';
 
 // Mock logger for testing
-function createMockLogger() {
-  return {
+function createMockLogger(): MockLogger {
+  const logger: MockLogger = {
     info: mock(() => {}),
     warn: mock(() => {}),
     error: mock(() => {}),
     debug: mock(() => {}),
+    options: mock(() => {}),
+    label: mock(() => {}),
+    fork: mock(() => logger)
   };
+  return logger;
 }
 
 // Mock Astro config
@@ -37,22 +42,22 @@ function createMockAstroConfig(): AstroConfig {
       assets: '_astro',
       serverEntry: 'entry.mjs',
       redirects: true,
-      inlineStylesheets: 'auto',
+      inlineStylesheets: 'auto'
     },
     markdown: {
       remarkPlugins: [],
-      rehypePlugins: [],
+      rehypePlugins: []
     },
     vite: {
-      plugins: [],
-    },
+      plugins: []
+    }
   } as unknown as AstroConfig;
 }
 
 describe('Astro Integration: Setup and Registration', () => {
   test('should return a valid AstroIntegration object', () => {
     const integration = fastMdTransformIntegration();
-    
+
     expect(integration).toBeDefined();
     expect(integration.name).toBe('@fastmd/plugin-transform');
     expect(integration.hooks).toBeDefined();
@@ -61,7 +66,7 @@ describe('Astro Integration: Setup and Registration', () => {
 
   test('should have all required hooks', () => {
     const integration = fastMdTransformIntegration();
-    
+
     expect(integration.hooks?.['astro:config:setup']).toBeDefined();
     expect(integration.hooks?.['astro:config:done']).toBeDefined();
     expect(integration.hooks?.['astro:server:setup']).toBeDefined();
@@ -78,11 +83,11 @@ describe('Astro Integration: Setup and Registration', () => {
           name: 'test-rule',
           stage: 'pre' as const,
           priority: 1,
-          transform: (content: string) => content,
+          transform: (content: string) => content
         }
-      ],
+      ]
     };
-    
+
     const integration = fastMdTransformIntegration(options);
     expect(integration).toBeDefined();
     expect(integration.name).toBe('@fastmd/plugin-transform');
@@ -105,22 +110,22 @@ describe('Astro Integration: Config Setup Hook', () => {
   test('should add remark plugin to markdown config', async () => {
     const integration = fastMdTransformIntegration();
     const setupHook = integration.hooks?.['astro:config:setup'];
-    
+
     if (setupHook) {
       await setupHook({
         config: astroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mockAddWatchFile,
-        logger: mockLogger as any,
+        logger: mockLogger as MockLogger,
         command: 'dev',
-        isRestart: false,
+        isRestart: false
       });
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
     const updateCall = mockUpdateConfig.mock.calls[0];
     const config = updateCall[0];
-    
+
     expect(config.markdown).toBeDefined();
     expect(config.markdown.remarkPlugins).toBeDefined();
     expect(Array.isArray(config.markdown.remarkPlugins)).toBe(true);
@@ -130,22 +135,22 @@ describe('Astro Integration: Config Setup Hook', () => {
   test('should add vite plugin to vite config', async () => {
     const integration = fastMdTransformIntegration();
     const setupHook = integration.hooks?.['astro:config:setup'];
-    
+
     if (setupHook) {
       await setupHook({
         config: astroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mockAddWatchFile,
-        logger: mockLogger as any,
+        logger: mockLogger as MockLogger,
         command: 'dev',
-        isRestart: false,
+        isRestart: false
       });
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
     const updateCall = mockUpdateConfig.mock.calls[0];
     const config = updateCall[0];
-    
+
     expect(config.vite).toBeDefined();
     expect(config.vite.plugins).toBeDefined();
     expect(Array.isArray(config.vite.plugins)).toBe(true);
@@ -161,22 +166,22 @@ describe('Astro Integration: Config Setup Hook', () => {
           name: 'test-rule',
           stage: 'pre' as const,
           priority: 1,
-          transform: (content: string) => content,
+          transform: (content: string) => content
         }
-      ],
+      ]
     };
-    
+
     const integration = fastMdTransformIntegration(options);
     const setupHook = integration.hooks?.['astro:config:setup'];
-    
+
     if (setupHook) {
       await setupHook({
         config: astroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mockAddWatchFile,
-        logger: mockLogger as any,
+        logger: mockLogger as MockLogger,
         command: 'dev',
-        isRestart: false,
+        isRestart: false
       });
     }
 
@@ -189,29 +194,31 @@ describe('Astro Integration: Config Setup Hook', () => {
   test('should preserve existing markdown plugins', async () => {
     const existingRemarkPlugin = mock(() => {});
     const existingRehypePlugin = mock(() => {});
-    
-    astroConfig.markdown = {
-      remarkPlugins: [existingRemarkPlugin],
-      rehypePlugins: [existingRehypePlugin],
-    };
-    
+
+    // Only set the properties we're testing
+    if (!astroConfig.markdown) {
+      astroConfig.markdown = {} as typeof astroConfig.markdown;
+    }
+    astroConfig.markdown.remarkPlugins = [existingRemarkPlugin];
+    astroConfig.markdown.rehypePlugins = [existingRehypePlugin];
+
     const integration = fastMdTransformIntegration();
     const setupHook = integration.hooks?.['astro:config:setup'];
-    
+
     if (setupHook) {
       await setupHook({
         config: astroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mockAddWatchFile,
-        logger: mockLogger as any,
+        logger: mockLogger as MockLogger,
         command: 'dev',
-        isRestart: false,
+        isRestart: false
       });
     }
 
     const updateCall = mockUpdateConfig.mock.calls[0];
     const config = updateCall[0];
-    
+
     // Should include both existing and new plugins
     expect(config.markdown.remarkPlugins.length).toBeGreaterThanOrEqual(2);
     expect(config.markdown.rehypePlugins.length).toBeGreaterThanOrEqual(1);
@@ -228,11 +235,11 @@ describe('Astro Integration: Build Lifecycle Hooks', () => {
   test('should execute config:done hook', async () => {
     const integration = fastMdTransformIntegration();
     const configDoneHook = integration.hooks?.['astro:config:done'];
-    
+
     if (configDoneHook) {
       await configDoneHook({
         config: createMockAstroConfig(),
-        logger: mockLogger as any,
+        logger: mockLogger as MockLogger
       });
     }
 
@@ -242,11 +249,11 @@ describe('Astro Integration: Build Lifecycle Hooks', () => {
   test('should execute server:setup hook', async () => {
     const integration = fastMdTransformIntegration();
     const serverSetupHook = integration.hooks?.['astro:server:setup'];
-    
+
     if (serverSetupHook) {
       await serverSetupHook({
-        server: {} as any,
-        logger: mockLogger as any,
+        server: {} as unknown,
+        logger: mockLogger as MockLogger
       });
     }
 
@@ -256,33 +263,31 @@ describe('Astro Integration: Build Lifecycle Hooks', () => {
   test('should execute build:start hook', async () => {
     const integration = fastMdTransformIntegration();
     const buildStartHook = integration.hooks?.['astro:build:start'];
-    
+
     if (buildStartHook) {
       await buildStartHook({
-        logger: mockLogger as any,
+        logger: mockLogger as MockLogger
       });
     }
 
-    expect(mockLogger.info).toHaveBeenCalledWith('Fast MD Transform optimizing for production build');
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Fast MD Transform optimizing for production build'
+    );
   });
 
   test('should execute build:done hook with route count', async () => {
     const integration = fastMdTransformIntegration();
     const buildDoneHook = integration.hooks?.['astro:build:done'];
-    
-    const mockRoutes = [
-      { pathname: '/page1' },
-      { pathname: '/page2' },
-      { pathname: '/page3' },
-    ];
-    
+
+    const mockRoutes = [{ pathname: '/page1' }, { pathname: '/page2' }, { pathname: '/page3' }];
+
     if (buildDoneHook) {
       await buildDoneHook({
         dir: new URL('file:///test/dist/'),
-        routes: mockRoutes as any,
-        logger: mockLogger as any,
+        routes: mockRoutes as unknown[],
+        logger: mockLogger as MockLogger,
         pages: [],
-        assets: new Map(),
+        assets: new Map()
       });
     }
 
@@ -302,15 +307,15 @@ describe('Astro Integration: Engine Mode Configuration', () => {
   test('should configure JS engine mode by default', async () => {
     const integration = fastMdTransformIntegration();
     const setupHook = integration.hooks?.['astro:config:setup'];
-    
+
     if (setupHook) {
       await setupHook({
         config: createMockAstroConfig(),
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: mockLogger as any,
+        logger: mockLogger as MockLogger,
         command: 'dev',
-        isRestart: false,
+        isRestart: false
       });
     }
 
@@ -320,18 +325,18 @@ describe('Astro Integration: Engine Mode Configuration', () => {
   test('should configure native engine mode when specified', async () => {
     const integration = fastMdTransformIntegration({
       engine: 'native',
-      nativeType: 'sidecar',
+      nativeType: 'sidecar'
     });
     const setupHook = integration.hooks?.['astro:config:setup'];
-    
+
     if (setupHook) {
       await setupHook({
         config: createMockAstroConfig(),
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: mockLogger as any,
+        logger: mockLogger as MockLogger,
         command: 'dev',
-        isRestart: false,
+        isRestart: false
       });
     }
 
@@ -343,21 +348,21 @@ describe('Astro Integration: Engine Mode Configuration', () => {
     // Save original env var
     const originalEnv = process.env.FASTMD_NATIVE;
     process.env.FASTMD_NATIVE = '1';
-    
+
     try {
       const integration = fastMdTransformIntegration({
-        engine: 'native',
+        engine: 'native'
       });
       const setupHook = integration.hooks?.['astro:config:setup'];
-      
+
       if (setupHook) {
         await setupHook({
           config: createMockAstroConfig(),
           updateConfig: mockUpdateConfig,
           addWatchFile: mock(() => {}),
-          logger: mockLogger as any,
+          logger: mockLogger as MockLogger,
           command: 'dev',
-          isRestart: false,
+          isRestart: false
         });
       }
 
@@ -367,7 +372,7 @@ describe('Astro Integration: Engine Mode Configuration', () => {
       if (originalEnv !== undefined) {
         process.env.FASTMD_NATIVE = originalEnv;
       } else {
-        delete process.env.FASTMD_NATIVE;
+        process.env.FASTMD_NATIVE = undefined as string | undefined;
       }
     }
   });
@@ -380,31 +385,31 @@ describe('Astro Integration: Custom Rules Configuration', () => {
       stage: 'pre' as const,
       priority: 1,
       pattern: /-->/g,
-      transform: (content: string) => content.replace(/-->/g, '→'),
+      transform: (content: string) => content.replace(/-->/g, '→')
     };
-    
+
     const integration = fastMdTransformIntegration({
-      customRules: [customRule],
+      customRules: [customRule]
     });
-    
+
     const setupHook = integration.hooks?.['astro:config:setup'];
     const mockUpdateConfig = mock(() => {});
-    
+
     if (setupHook) {
       await setupHook({
         config: createMockAstroConfig(),
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: createMockLogger() as any,
+        logger: createMockLogger() as MockLogger,
         command: 'dev',
-        isRestart: false,
+        isRestart: false
       });
     }
 
     expect(mockUpdateConfig).toHaveBeenCalled();
     const updateCall = mockUpdateConfig.mock.calls[0];
     const config = updateCall[0];
-    
+
     // Verify remark plugin was added
     expect(config.markdown.remarkPlugins.length).toBeGreaterThan(0);
   });
@@ -413,15 +418,15 @@ describe('Astro Integration: Custom Rules Configuration', () => {
     const integration = fastMdTransformIntegration({});
     const setupHook = integration.hooks?.['astro:config:setup'];
     const mockUpdateConfig = mock(() => {});
-    
+
     if (setupHook) {
       await setupHook({
         config: createMockAstroConfig(),
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: createMockLogger() as any,
+        logger: createMockLogger() as MockLogger,
         command: 'dev',
-        isRestart: false,
+        isRestart: false
       });
     }
 

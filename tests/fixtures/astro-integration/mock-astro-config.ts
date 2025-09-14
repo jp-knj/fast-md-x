@@ -17,36 +17,36 @@ export function createTestAstroConfig(overrides: Partial<AstroConfig> = {}): Ast
       assets: '_astro',
       serverEntry: 'entry.mjs',
       redirects: true,
-      inlineStylesheets: 'auto',
+      inlineStylesheets: 'auto'
     },
     markdown: {
       remarkPlugins: [],
       rehypePlugins: [],
       shikiConfig: {
         theme: 'github-dark',
-        wrap: false,
+        wrap: false
       },
-      syntaxHighlight: 'shiki',
+      syntaxHighlight: 'shiki'
     },
     vite: {
       plugins: [],
       optimizeDeps: {
         include: [],
-        exclude: [],
+        exclude: []
       },
       ssr: {
         external: [],
-        noExternal: [],
-      },
+        noExternal: []
+      }
     },
     integrations: [],
     adapter: undefined,
     output: 'static',
     server: {
       host: false,
-      port: 4321,
+      port: 4321
     },
-    ...overrides,
+    ...overrides
   } as unknown as AstroConfig;
 }
 
@@ -59,22 +59,22 @@ export const mockCustomRules = [
     stage: 'pre' as const,
     priority: 1,
     pattern: /-->/g,
-    transform: (content: string) => content.replace(/-->/g, '→'),
+    transform: (content: string) => content.replace(/-->/g, '→')
   },
   {
     name: 'double-arrow-replacer',
     stage: 'pre' as const,
     priority: 1,
     pattern: /==>/g,
-    transform: (content: string) => content.replace(/==>/g, '⇨'),
+    transform: (content: string) => content.replace(/==>/g, '⇨')
   },
   {
     name: 'test-pattern',
     stage: 'post' as const,
     priority: 2,
     pattern: /<test>/g,
-    transform: (content: string) => content.replace(/<test>/g, '[TEST]'),
-  },
+    transform: (content: string) => content.replace(/<test>/g, '[TEST]')
+  }
 ];
 
 /**
@@ -85,7 +85,7 @@ export function createMockLogger() {
     info: [] as string[],
     warn: [] as string[],
     error: [] as string[],
-    debug: [] as string[],
+    debug: [] as string[]
   };
 
   return {
@@ -99,6 +99,6 @@ export function createMockLogger() {
       logs.warn = [];
       logs.error = [];
       logs.debug = [];
-    },
+    }
   };
 }
