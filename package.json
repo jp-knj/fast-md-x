@@ -25,6 +25,9 @@
     "bench:engines": "node bench/run.mjs --engine=all --pages=10",
     "bench:heavy": "node bench/run.mjs --engine=all --pages=10 --heavy",
     "packages:build": "pnpm -r --filter './packages/*' build",
+    "changeset": "changeset",
+    "ci:version": "changeset version",
+    "ci:publish": "pnpm packages:build && changeset publish",
     "sidecar:build": "cd engines/sidecar && cargo build --release",
     "sidecar:test": "cd engines/sidecar && cargo test"
   },
@@ -45,6 +48,7 @@
     "@types/cacache": "19.0.0",
     "ajv": "^8.17.1",
     "bun-types": "1.2.21",
+    "@changesets/cli": "^2.27.9",
     "knip": "5.63.1",
     "typescript": "5.9.2"
   },

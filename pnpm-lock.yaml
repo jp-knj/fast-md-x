@@ -67,7 +67,7 @@ importers:
   packages/fastmd-plugin-transform:
     dependencies:
       '@fastmd/shared':
-        specifier: workspace:*
+        specifier: ^0.1.0
         version: link:../fastmd-shared
       gray-matter:
         specifier: ^4.0.3
