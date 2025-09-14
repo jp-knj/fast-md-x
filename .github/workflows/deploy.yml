@@ -29,11 +29,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+      - name: Enable Corepack
+        run: corepack enable
       - name: Install pnpm
-        run: npm install -g pnpm@10.13.1
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+        run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
       - name: Lint (Biome)
@@ -57,11 +56,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+      - name: Enable Corepack
+        run: corepack enable
       - name: Install pnpm
-        run: npm install -g pnpm@10.13.1
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+        run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
       - name: Restore fastmd cache
@@ -96,11 +94,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+      - name: Enable Corepack
+        run: corepack enable
       - name: Install pnpm
-        run: npm install -g pnpm@10.13.1
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+        run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
       - name: Test NDJSON logging format
@@ -126,11 +123,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+      - name: Enable Corepack
+        run: corepack enable
       - name: Install pnpm
-        run: npm install -g pnpm@10.13.1
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+        run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
       - name: Setup Bun

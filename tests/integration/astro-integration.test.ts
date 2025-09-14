@@ -446,7 +446,10 @@ describe('Astro Integration: Custom Rules Configuration', () => {
     });
 
     const setupHook = integration.hooks?.['astro:config:setup'];
-    const mockUpdateConfig = mock((newConfig: Partial<AstroConfig>) => ({ ...createMockAstroConfig(), ...newConfig }));
+    const mockUpdateConfig = mock((newConfig: Partial<AstroConfig>) => ({
+      ...createMockAstroConfig(),
+      ...newConfig
+    }));
 
     if (setupHook) {
       await setupHook({
@@ -467,7 +470,10 @@ describe('Astro Integration: Custom Rules Configuration', () => {
   test('should work without custom rules', async () => {
     const integration = fastMdTransformIntegration({});
     const setupHook = integration.hooks?.['astro:config:setup'];
-    const mockUpdateConfig = mock(() => astroConfig);
+    const mockUpdateConfig = mock((newConfig: Partial<AstroConfig>) => ({
+      ...createMockAstroConfig(),
+      ...newConfig
+    }));
 
     if (setupHook) {
       await setupHook({

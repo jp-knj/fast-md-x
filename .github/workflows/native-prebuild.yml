@@ -23,11 +23,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install pnpm
-        run: npm install -g pnpm@10.13.1
+      - name: Enable Corepack
+        run: corepack enable
 
-      - name: Enable pnpm via Corepack
-        run: corepack enable && corepack prepare pnpm@10.13.1 --activate
+      - name: Install pnpm
+        run: corepack prepare pnpm@10.13.1 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -132,8 +132,11 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Install pnpm
-        run: npm install -g pnpm@10.13.1
+        run: corepack prepare pnpm@10.13.1 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
