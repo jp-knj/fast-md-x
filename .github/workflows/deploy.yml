@@ -1,20 +1,15 @@
 name: Deploy to GitHub Pages
 
 on:
-  # Trigger the workflow every time you push to the `main` branch
-  # Using a different branch name? Replace `main` with your branch’s name
   push:
     branches: [main]
-  # Allows you to run this workflow manually from the Actions tab on GitHub.
   workflow_dispatch:
 
-# Allow this job to clone the repo and create a page deployment
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow one concurrent deployment
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -35,12 +30,29 @@ jobs:
         run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
+      - name: Clean package build outputs
+        run: rm -rf packages/*/dist
       - name: Build workspace packages
         run: pnpm packages:build
       - name: Lint (Biome)
         run: pnpm check
       - name: Typecheck (tsc)
         run: pnpm typecheck
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Run tests (bun test, JUnit report)
+        run: |
+          mkdir -p reports
+          bun test --no-color --reporter=junit --reporter-outfile reports/junit.xml
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-report
+          path: reports/junit.xml
+          retention-days: 7
 
   build:
     needs: test
@@ -67,6 +79,21 @@ jobs:
           key: ${{ runner.os }}-fastmd-${{ hashFiles('pnpm-lock.yaml', 'fastmd.config.yml', 'fastmd.config.yaml') }}
           restore-keys: |
             ${{ runner.os }}-fastmd-
+      - name: Build site with NDJSON logging
+        run: |
+          set -o pipefail
+          FASTMD_LOG=json pnpm build 2>&1 | tee build.ndjson | node scripts/validate-ndjson.mjs
+      - name: Archive NDJSON logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-ndjson
+          path: build.ndjson
+          retention-days: 7
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
 
   native-test:
     needs: test
@@ -84,13 +111,37 @@ jobs:
         run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Clean package build outputs
+        run: rm -rf packages/*/dist
       - name: Build workspace packages
         run: pnpm packages:build
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: |
+          curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+      - name: Add wasm32 target (ensure)
+        run: rustup target add wasm32-unknown-unknown
       - name: Rust unit tests (native crate)
         run: pnpm native:test
       - name: Build native addon (napi)
         run: pnpm native:build
       - name: JS tests with native path
         run: pnpm test:native
+
+  deploy:
+    needs: [build, native-test]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,60 @@
+name: Publish Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "npm dist-tag (e.g., latest, next)"
+        required: false
+        default: latest
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install pnpm
+        run: corepack prepare pnpm@10.13.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm packages:build
+
+      - name: Dry-run publish (@fastmd/shared)
+        run: npm publish --dry-run
+        working-directory: packages/fastmd-shared
+
+      - name: Dry-run publish (@fastmd/plugin-transform)
+        run: npm publish --dry-run
+        working-directory: packages/fastmd-plugin-transform
+
+      - name: Publish @fastmd/shared
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --access public --tag "${{ github.event.inputs.tag || 'latest' }}"
+        working-directory: packages/fastmd-shared
+
+      - name: Publish @fastmd/plugin-transform
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --access public --tag "${{ github.event.inputs.tag || 'latest' }}"
+        working-directory: packages/fastmd-plugin-transform
+
