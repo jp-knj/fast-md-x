@@ -35,6 +35,8 @@ jobs:
         run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm packages:build
       - name: Lint (Biome)
         run: pnpm check
       - name: Typecheck (tsc)
@@ -72,6 +74,8 @@ jobs:
         run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: pnpm packages:build
       - name: Restore fastmd cache
         uses: actions/cache@v4
         with:
@@ -143,6 +147,8 @@ jobs:
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
+      - name: Build workspace packages
+        run: pnpm packages:build
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Rust unit tests (native crate)
