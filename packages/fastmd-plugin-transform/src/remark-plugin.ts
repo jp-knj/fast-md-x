@@ -1,6 +1,7 @@
 import type { Paragraph, Root, Text } from 'mdast';
 import type { Plugin } from 'unified';
 import { visit } from 'unist-util-visit';
+import type { VFile } from 'vfile';
 import type { CustomTransformRule, FastMdTransformOptions, TransformContext } from './index';
 import { TransformPipeline } from './transform-pipeline';
 
@@ -8,26 +9,20 @@ import { TransformPipeline } from './transform-pipeline';
  * Create a Remark plugin that applies custom transformation rules
  */
 export function createRemarkPlugin(options: FastMdTransformOptions): Plugin<[], Root> {
-  return function fastMdRemarkPlugin() {
+  return function fastMdRemarkPlugin(): ReturnType<Plugin<[], Root>> {
     // Create transform pipeline with custom rules
     const pipeline = new TransformPipeline(options.customRules);
 
-    return async (
-      tree: Root,
-      file: {
-        path?: string;
-        history?: string[];
-        value?: string;
-        data?: { astro?: { frontmatter?: Record<string, unknown> } };
-      }
-    ) => {
+    return async (tree: Root, file: VFile) => {
       const filepath = file.path || file.history?.[0] || 'unknown';
 
       // Create transform context
       const context: TransformContext = {
         filepath,
-        content: file.value || '',
-        frontmatter: file.data?.astro?.frontmatter || {},
+        content: typeof file.value === 'string' ? file.value : '',
+        frontmatter:
+          (file.data as unknown as { astro?: { frontmatter?: Record<string, unknown> } })?.astro
+            ?.frontmatter || {},
         mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
         metadata: {}
       };
@@ -101,7 +96,12 @@ export function createRemarkPlugin(options: FastMdTransformOptions): Plugin<[], 
 
       // Process collected nodes asynchronously
       for (const { node, type } of nodesToProcess) {
-        await processNode(node, options.customRules, context, type);
+        await processNode(
+          node as { children?: Array<{ type: string; value?: string }> },
+          options.customRules,
+          context,
+          type
+        );
       }
 
       // Execute afterTransform hook
@@ -109,10 +109,10 @@ export function createRemarkPlugin(options: FastMdTransformOptions): Plugin<[], 
         // Note: In remark context, we work with AST, not HTML output
         const result = await options.hooks.afterTransform({
           ...context,
-          output: file.value
+          output: typeof file.value === 'string' ? file.value : ''
         });
 
-        if (result && result !== file.value) {
+        if (result && typeof file.value === 'string' && result !== file.value) {
           file.value = result;
         }
       }
@@ -144,11 +144,11 @@ async function processNode(
   if (node.children) {
     for (const child of node.children) {
       if (child.type === 'text') {
-        let text = child.value;
+        let text = child.value || '';
 
         for (const rule of applicableRules) {
           try {
-            text = await applyRuleToText(text, rule, context);
+            text = await applyRuleToText(text || '', rule, context);
           } catch (err) {
             console.warn(`[Remark Plugin] Failed to apply rule '${rule.name}':`, err);
           }

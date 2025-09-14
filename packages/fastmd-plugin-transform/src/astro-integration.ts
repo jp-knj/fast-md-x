@@ -1,5 +1,5 @@
 import type { AstroConfig, AstroIntegration } from 'astro';
-import type { Plugin } from 'vite';
+import type { Plugin, PluginOption } from 'vite';
 import type { FastMdTransformOptions } from './index';
 import { createRemarkPlugin } from './remark-plugin';
 import { createVitePlugin } from './vite-plugin';
@@ -34,7 +34,7 @@ export function fastMdTransformIntegration(options: FastMdTransformOptions = {})
             rehypePlugins: [...(astroConfig.markdown?.rehypePlugins || [])]
           },
           vite: {
-            plugins: [vitePlugin]
+            plugins: [vitePlugin as unknown as PluginOption]
           }
         });
 
