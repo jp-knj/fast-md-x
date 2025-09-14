@@ -4,12 +4,24 @@
  *
  * Tests individual hook behaviors in isolation with mocked dependencies
  */
-import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { describe, expect, mock, test } from 'bun:test';
 import { fastMdTransformIntegration } from '../../packages/fastmd-plugin-transform/dist/astro-integration.js';
 import type { FastMdTransformOptions } from '../../packages/fastmd-plugin-transform/dist/index.js';
-import { createRemarkPlugin } from '../../packages/fastmd-plugin-transform/dist/remark-plugin.js';
-import { createVitePlugin } from '../../packages/fastmd-plugin-transform/dist/vite-plugin.js';
 import type { MockAstroConfig, MockLogger } from '../test-types';
+
+// Helper to create inline mock logger
+function createInlineMockLogger(): MockLogger {
+  const logger: MockLogger = {
+    info: mock(() => {}),
+    warn: mock(() => {}),
+    error: mock(() => {}),
+    debug: mock(() => {}),
+    options: {},
+    label: 'test',
+    fork: mock(() => logger)
+  };
+  return logger;
+}
 
 describe('Unit: Hook Function Behavior', () => {
   test('config:setup hook should handle missing markdown config gracefully', async () => {
@@ -32,12 +44,7 @@ describe('Unit: Hook Function Behavior', () => {
         config: mockConfig as MockAstroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         command: 'dev',
         isRestart: false
       });
@@ -67,12 +74,7 @@ describe('Unit: Hook Function Behavior', () => {
         config: mockConfig as MockAstroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         command: 'dev',
         isRestart: false
       });
@@ -122,12 +124,7 @@ describe('Unit: Hook Function Behavior', () => {
       await buildDoneHook({
         dir: new URL('file:///test/dist/'),
         routes: [],
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         pages: [],
         assets: new Map()
       });
@@ -183,12 +180,7 @@ describe('Unit: Options Validation and Processing', () => {
         config: { markdown: {}, vite: {} } as MockAstroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         command: 'dev',
         isRestart: false
       });
@@ -322,12 +314,7 @@ describe('Unit: Plugin Creation and Registration', () => {
         config: { markdown: {}, vite: {} } as MockAstroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         command: 'dev',
         isRestart: false
       });
@@ -358,12 +345,7 @@ describe('Unit: Plugin Creation and Registration', () => {
         config: { markdown: {}, vite: {} } as MockAstroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         command: 'dev',
         isRestart: false
       });
@@ -388,12 +370,7 @@ describe('Unit: Command and Restart Handling', () => {
         config: { markdown: {}, vite: {} } as MockAstroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         command: 'dev',
         isRestart: false
       });
@@ -414,12 +391,7 @@ describe('Unit: Command and Restart Handling', () => {
         config: { markdown: {}, vite: {} } as MockAstroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         command: 'build',
         isRestart: false
       });
@@ -440,12 +412,7 @@ describe('Unit: Command and Restart Handling', () => {
         config: { markdown: {}, vite: {} } as MockAstroConfig,
         updateConfig: mockUpdateConfig,
         addWatchFile: mock(() => {}),
-        logger: {
-          info: mock(() => {}),
-          warn: mock(() => {}),
-          error: mock(() => {}),
-          debug: mock(() => {})
-        } as MockLogger,
+        logger: createInlineMockLogger(),
         command: 'dev',
         isRestart: true
       });

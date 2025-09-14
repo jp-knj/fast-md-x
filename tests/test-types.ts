@@ -8,9 +8,9 @@ import type { AstroIntegrationLogger } from 'astro';
  * Partial mock implementation of AstroIntegrationLogger for testing
  */
 export type MockLogger = Pick<AstroIntegrationLogger, 'info' | 'warn' | 'error' | 'debug'> & {
-  options?: (options: unknown) => void;
-  label?: (label: string) => void;
-  fork?: (label: string) => MockLogger;
+  options: Record<string, unknown>;
+  label: string;
+  fork: (label: string) => MockLogger;
 };
 
 /**
