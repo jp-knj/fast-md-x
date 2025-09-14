@@ -67,21 +67,6 @@ jobs:
           key: ${{ runner.os }}-fastmd-${{ hashFiles('pnpm-lock.yaml', 'fastmd.config.yml', 'fastmd.config.yaml') }}
           restore-keys: |
             ${{ runner.os }}-fastmd-
-      - name: Build site with NDJSON logging
-        run: |
-          set -o pipefail
-          FASTMD_LOG=json pnpm build 2>&1 | tee build.ndjson | node scripts/validate-ndjson.mjs
-      - name: Archive NDJSON logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs-ndjson
-          path: build.ndjson
-          retention-days: 7
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
 
   native-test:
     needs: test
