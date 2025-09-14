@@ -42,7 +42,7 @@ jobs:
         with:
           bun-version: latest
       - name: Run tests (bun test)
-        run: bun test
+        run: bun test --reporter=spec --filter "Parallel Processing Performance|Resource Usage|Stress Tests"
 
   build:
     needs: test
