@@ -30,6 +30,8 @@ pnpm-debug.log*
 # TypeScript build outputs
 packages/*/dist/
 packages/*/*.tsbuildinfo
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 
 # Rust/Cargo outputs
 engines/*/target/
