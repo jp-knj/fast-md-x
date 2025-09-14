@@ -68,7 +68,8 @@ pub fn transform_markdown_rs(input: &str, options_json: Option<String>) -> Strin
 
     if options.footnotes.unwrap_or(true) {
         parse_options.constructs.gfm_footnote_definition = true;
-        parse_options.constructs.label_start_footnote = true;
+        // API change in markdown-rs: use gfm_label_start_footnote
+        parse_options.constructs.gfm_label_start_footnote = true;
     }
 
     if options.strikethrough.unwrap_or(true) {

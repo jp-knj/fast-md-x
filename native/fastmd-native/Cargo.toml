@@ -12,10 +12,9 @@ sha2 = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 markdown = "1.0.0-alpha.21"
-pulldown-cmark = { version = "0.12", default-features = false }
+pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
 comrak = { version = "0.29", default-features = false, features = ["syntect"] }
 
 [profile.release]
 opt-level = "z"
 lto = true
-
