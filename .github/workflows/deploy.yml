@@ -94,14 +94,3 @@ jobs:
         run: pnpm native:build
       - name: JS tests with native path
         run: pnpm test:native
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v1
