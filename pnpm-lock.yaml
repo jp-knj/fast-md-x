@@ -64,8 +64,6 @@ importers:
 
   native/fastmd-native: {}
 
-  native/fastmd-native/pkg: {}
-
   packages/fastmd-plugin-transform:
     dependencies:
       '@fastmd/shared':

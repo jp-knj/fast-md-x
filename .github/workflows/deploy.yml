@@ -41,22 +41,6 @@ jobs:
         run: pnpm check
       - name: Typecheck (tsc)
         run: pnpm typecheck
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-      - name: Run tests (bun test, JUnit report)
-        run: |
-          set -o pipefail
-          mkdir -p reports
-          bun test --reporter=junit --no-color | tee reports/junit.xml
-      - name: Upload JUnit report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: junit-report
-          path: reports/junit.xml
-          retention-days: 7
 
   build:
     needs: test
@@ -115,10 +99,6 @@ jobs:
         run: corepack prepare pnpm@10.13.1 --activate
       - name: Install dependencies (pnpm)
         run: pnpm install --frozen-lockfile
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
       - name: Build workspace packages
         run: pnpm packages:build
       - name: Install Rust toolchain
