@@ -50,7 +50,7 @@ jobs:
           bun test --reporter=junit --no-color | tee reports/junit.xml
       - name: Upload JUnit report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: junit-report
           path: reports/junit.xml
@@ -85,7 +85,7 @@ jobs:
           FASTMD_LOG=json pnpm build 2>&1 | tee build.ndjson | node scripts/validate-ndjson.mjs
       - name: Archive NDJSON logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-logs-ndjson
           path: build.ndjson
