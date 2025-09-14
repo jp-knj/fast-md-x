@@ -41,11 +41,16 @@ const rl = createInterface({
   crlfDelay: Number.POSITIVE_INFINITY
 });
 
+function looksLikeJSON(s) {
+  const t = s.trimStart();
+  return t.startsWith('{') || t.startsWith('[');
+}
+
 rl.on('line', (line) => {
   stats.totalLines++;
 
-  // Skip empty lines
-  if (!line.trim()) {
+  // Skip empty or non-JSON-looking lines (allow mixed stdout/stderr)
+  if (!line.trim() || !looksLikeJSON(line)) {
     return;
   }
 
@@ -84,6 +89,7 @@ rl.on('line', (line) => {
       );
     }
   } catch (err) {
+    // Only count parse errors for lines that looked like JSON
     stats.invalidLines++;
     stats.errors.push(`Line ${stats.totalLines}: ${err.message}`);
   }
