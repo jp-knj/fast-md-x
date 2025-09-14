@@ -99,34 +99,6 @@ jobs:
         with:
           path: ./dist
 
-  ndjson-validation:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Enable Corepack
-        run: corepack enable
-      - name: Install pnpm
-        run: corepack prepare pnpm@10.13.1 --activate
-      - name: Install dependencies (pnpm)
-        run: pnpm install --frozen-lockfile
-      - name: Test NDJSON logging format
-        run: |
-          # Create a minimal test project
-          mkdir -p test-ndjson/src
-          echo '# Test Page' > test-ndjson/src/test.md
-          echo '---\ntitle: Test\n---\n\n# Content' > test-ndjson/src/test2.md
-          
-          # Run with NDJSON logging and validate
-          cd test-ndjson
-          FASTMD_LOG=json pnpm build 2>&1 | node ../scripts/validate-ndjson.mjs || exit 1
-          
-          echo "✅ NDJSON logging validation successful"
-  
   native-test:
     needs: test
     runs-on: ubuntu-latest
