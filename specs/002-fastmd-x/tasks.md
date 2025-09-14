@@ -47,7 +47,7 @@ Format: `[ID] [P?] Description` — [P] = parallel-safe（異なるファイル�
 - [ ] T401 [P] Lint/Typecheck gates pass (`pnpm check && pnpm typecheck`)
 - [ ] T402 [P] Knip baseline stays green (`pnpm knip`)
 - [ ] T403 Changelog entry + DoD mapping（Spec の D1–D4 に対応）
-- [ ] T404 [P] CI path with `FASTMD_LOG=json` emits NDJSON parsable lines
+- [x] T404 [P] CI path with `FASTMD_LOG=json` emits NDJSON parsable lines
 
 ## Dependencies
 - T201 で `picomatch` を検討（理由: 高速・安定・豊富な glob 機能）。代替は `minimatch` または簡易実装。採否は PR で決定。

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 /// Normalize a file path for consistent processing
+#[allow(dead_code)]
 pub fn normalize_path(path: &str) -> String {
     let path = Path::new(path);
     

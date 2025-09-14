@@ -50,14 +50,18 @@ pub struct RpcError {
 
 // Error codes
 pub const PARSE_ERROR: i32 = -32700;
+#[allow(dead_code)]
 pub const INVALID_REQUEST: i32 = -32600;
 pub const METHOD_NOT_FOUND: i32 = -32601;
 pub const INVALID_PARAMS: i32 = -32602;
+#[allow(dead_code)]
 pub const INTERNAL_ERROR: i32 = -32603;
 
 // Custom error codes
 pub const TRANSFORM_ERROR: i32 = -32001;
+#[allow(dead_code)]
 pub const CACHE_ERROR: i32 = -32002;
+#[allow(dead_code)]
 pub const IO_ERROR: i32 = -32003;
 
 pub fn create_response(id: RpcId, result: Value) -> RpcResponse {

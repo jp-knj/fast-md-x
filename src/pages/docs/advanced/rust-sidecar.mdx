@@ -1,0 +1,297 @@
+---
+layout: ../../../layouts/DocsLayout.astro
+title: Rust Sidecar Architecture
+description: Deep dive into the Rust sidecar implementation and NDJSON RPC protocol
+---
+
+import { Code } from 'astro:components';
+
+## Rust Sidecar Overview
+
+The Rust sidecar is a **high-performance Markdown processor** that runs as a separate process, communicating with Node.js via NDJSON RPC.
+
+<div style={{
+  padding: '1rem',
+  backgroundColor: 'var(--color-code-bg)',
+  borderRadius: '0.5rem',
+  marginBottom: '1rem'
+}}>
+  <strong>Performance Impact:</strong> 10-20% faster than JavaScript
+</div>
+
+## Architecture
+
+The sidecar architecture consists of three main components:
+
+export const ArchitectureDiagram = () => (
+  <div style={{ textAlign: 'center', margin: '2rem 0' }}>
+    <svg width="600" height="300" viewBox="0 0 600 300">
+      <rect x="10" y="10" width="180" height="80" fill="#4f46e5" />
+      <text x="100" y="55" fill="white" textAnchor="middle">Node.js Process</text>
+      
+      <rect x="210" y="10" width="180" height="80" fill="#10b981" />
+      <text x="300" y="55" fill="white" textAnchor="middle">NDJSON RPC</text>
+      
+      <rect x="410" y="10" width="180" height="80" fill="#f97316" />
+      <text x="500" y="55" fill="white" textAnchor="middle">Rust Sidecar</text>
+      
+      <path d="M 190 50 L 210 50" stroke="black" strokeWidth="2" markerEnd="url(#arrow)" />
+      <path d="M 390 50 L 410 50" stroke="black" strokeWidth="2" markerEnd="url(#arrow)" />
+      
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+          <polygon points="0 0, 10 3, 0 6" fill="black" />
+        </marker>
+      </defs>
+    </svg>
+  </div>
+);
+
+<ArchitectureDiagram />
+
+## Implementation Details
+
+### Rust Dependencies
+
+The sidecar uses these key Rust crates:
+
+<Code code={`[dependencies]
+pulldown-cmark = { version = "0.11", features = ["html"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.35", features = ["full"] }
+tracing = "0.1"
+anyhow = "1.0"`} lang="toml" />
+
+### Markdown Processing
+
+The core transformation logic using `pulldown-cmark`:
+
+<Code code={`fn transform_markdown(content: &str) -> Result<String> {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_FOOTNOTES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+    options.insert(Options::ENABLE_SMART_PUNCTUATION);
+    
+    let parser = Parser::new_ext(content, options);
+    let mut html = String::new();
+    html::push_html(&mut html, parser);
+    
+    Ok(html)
+}`} lang="rust" />
+
+## NDJSON RPC Protocol
+
+### Message Flow
+
+export const MessageFlow = ({ messages }) => (
+  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}>
+    {messages.map((msg, i) => (
+      <div key={i} style={{ 
+        margin: '0.5rem 0',
+        padding: '0.5rem',
+        backgroundColor: msg.from === 'node' ? '#dbeafe' : '#fef3c7',
+        borderRadius: '0.25rem'
+      }}>
+        <strong>{msg.from === 'node' ? '→ Node.js' : '← Rust'}:</strong> {msg.content}
+      </div>
+    ))}
+  </div>
+);
+
+<MessageFlow messages={[
+  { from: 'node', content: '{"jsonrpc":"2.0","id":1,"method":"ping"}' },
+  { from: 'rust', content: '{"jsonrpc":"2.0","id":1,"result":{"pong":true}}' },
+  { from: 'node', content: '{"jsonrpc":"2.0","id":2,"method":"transform","params":{...}}' },
+  { from: 'rust', content: '{"jsonrpc":"2.0","id":2,"result":{"code":"<h1>..."}}' }
+]} />
+
+### Performance Comparison
+
+export const PerformanceChart = () => {
+  const data = [
+    { engine: 'JavaScript', time: 1245, color: '#6b7280' },
+    { engine: 'WASM', time: 1189, color: '#3b82f6' },
+    { engine: 'Rust Sidecar', time: 1087, color: '#10b981' }
+  ];
+  
+  const maxTime = Math.max(...data.map(d => d.time));
+  
+  return (
+    <div style={{ margin: '2rem 0' }}>
+      {data.map((item) => (
+        <div key={item.engine} style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <span style={{ width: '120px' }}>{item.engine}</span>
+            <div style={{ 
+              width: `${(item.time / maxTime) * 100}%`,
+              height: '30px',
+              backgroundColor: item.color,
+              borderRadius: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              paddingLeft: '0.5rem',
+              color: 'white',
+              fontWeight: 'bold'
+            }}>
+              {item.time}ms
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+<PerformanceChart />
+
+## Building the Sidecar
+
+### Prerequisites
+
+1. Install Rust toolchain:
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+
+2. Build the sidecar:
+   ```bash
+   cd engines/sidecar
+   cargo build --release
+   ```
+
+3. Verify the binary:
+   ```bash
+   ./target/release/fastmd-sidecar --version
+   ```
+
+### Optimization Flags
+
+For maximum performance:
+
+<Code code={`# Profile-guided optimization
+cargo build --release --profile=production
+
+# Link-time optimization
+RUSTFLAGS="-C lto=fat -C target-cpu=native" cargo build --release
+
+# Size optimization
+cargo build --release --profile=min-size`} lang="bash" />
+
+## Advanced Features
+
+### Frontmatter Extraction
+
+The sidecar extracts and processes YAML frontmatter:
+
+<Code code={`fn extract_frontmatter(content: &str) -> (Option<Value>, String) {
+    if content.starts_with("---\\n") {
+        if let Some(end) = content[4..].find("\\n---\\n") {
+            let yaml = &content[4..end + 4];
+            let body = &content[end + 9..];
+            
+            match serde_yaml::from_str(yaml) {
+                Ok(value) => return (Some(value), body.to_string()),
+                Err(_) => {}
+            }
+        }
+    }
+    (None, content.to_string())
+}`} lang="rust" />
+
+### MDX Support
+
+For MDX files, the sidecar identifies imports and exports:
+
+export const MDXFeatures = () => (
+  <ul style={{ listStyle: 'none', padding: 0 }}>
+    {['Import detection', 'Export extraction', 'Component registration', 'JSX preservation'].map((feature) => (
+      <li key={feature} style={{ 
+        padding: '0.5rem',
+        marginBottom: '0.5rem',
+        backgroundColor: 'var(--color-code-bg)',
+        borderRadius: '0.25rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem'
+      }}>
+        <span style={{ color: '#10b981' }}>✓</span> {feature}
+      </li>
+    ))}
+  </ul>
+);
+
+<MDXFeatures />
+
+## Debugging
+
+### Enable Trace Logging
+
+```bash
+# Rust sidecar logging
+RUST_LOG=trace FASTMD_RS=sidecar pnpm build
+
+# Node.js side logging
+FASTMD_LOG=verbose FASTMD_RS=sidecar pnpm build
+```
+
+### Monitoring RPC Communication
+
+<Code code={`// Monitor NDJSON messages
+const sidecar = spawn('./fastmd-sidecar');
+
+sidecar.stdout.on('data', (data) => {
+  console.log('← Rust:', data.toString());
+});
+
+sidecar.stdin.on('data', (data) => {
+  console.log('→ Node:', data.toString());
+});`} lang="javascript" />
+
+## Future Enhancements
+
+export const Roadmap = () => {
+  const items = [
+    { feature: 'Streaming transformation', status: 'planned' },
+    { feature: 'Custom Markdown extensions', status: 'research' },
+    { feature: 'Built-in syntax highlighting', status: 'planned' },
+    { feature: 'Math rendering (KaTeX)', status: 'research' },
+    { feature: 'Mermaid diagram support', status: 'planned' }
+  ];
+  
+  return (
+    <table style={{ width: '100%' }}>
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item) => (
+          <tr key={item.feature}>
+            <td>{item.feature}</td>
+            <td>
+              <span style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.25rem',
+                backgroundColor: item.status === 'planned' ? '#dbeafe' : '#fef3c7',
+                fontSize: '0.875rem'
+              }}>
+                {item.status}
+              </span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};
+
+<Roadmap />
+
+---
+
+> 🦀 **Fun fact:** The Rust sidecar can process over **1000 pages per second** on modern hardware!

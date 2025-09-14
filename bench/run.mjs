@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 
-import { performance } from 'node:perf_hooks';
 import { spawn } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Parse arguments
 const args = process.argv.slice(2);
-const engine = args.find(a => a.startsWith('--engine='))?.split('=')[1] || 'js';
-const pages = parseInt(args.find(a => a.startsWith('--pages='))?.split('=')[1] || '10');
+const engine = args.find((a) => a.startsWith('--engine='))?.split('=')[1] || 'js';
+const pages = Number.parseInt(args.find((a) => a.startsWith('--pages='))?.split('=')[1] || '10');
 const heavy = args.includes('--heavy');
 
-console.log(`Benchmark Configuration:`);
+console.log('Benchmark Configuration:');
 console.log(`  Engine: ${engine}`);
 console.log(`  Pages: ${pages}`);
 console.log(`  Heavy content: ${heavy}`);
@@ -23,7 +23,7 @@ console.log('');
 // Create test content
 function generateMarkdown(index, heavy = false) {
   const content = [`# Test Page ${index}`, ''];
-  
+
   // Add frontmatter
   content.push('---');
   content.push(`title: Test Page ${index}`);
@@ -31,11 +31,11 @@ function generateMarkdown(index, heavy = false) {
   content.push(`tags: [test, benchmark, page${index}]`);
   content.push('---');
   content.push('');
-  
+
   // Add content
   content.push(`This is test page number ${index}.`);
   content.push('');
-  
+
   if (heavy) {
     // Add tables
     content.push('## Data Table');
@@ -46,7 +46,7 @@ function generateMarkdown(index, heavy = false) {
       content.push(`| Data ${i}A | Data ${i}B | Data ${i}C |`);
     }
     content.push('');
-    
+
     // Add code blocks
     content.push('## Code Examples');
     content.push('');
@@ -56,7 +56,7 @@ function generateMarkdown(index, heavy = false) {
     content.push('}');
     content.push('```');
     content.push('');
-    
+
     // Add lists
     content.push('## Task List');
     content.push('');
@@ -64,14 +64,14 @@ function generateMarkdown(index, heavy = false) {
       content.push(`- [${i % 2 === 0 ? 'x' : ' '}] Task item ${i}`);
     }
     content.push('');
-    
+
     // Add long paragraphs
     for (let i = 0; i < 5; i++) {
       content.push(`Lorem ipsum dolor sit amet, consectetur adipiscing elit. ${i} `.repeat(10));
       content.push('');
     }
   }
-  
+
   return content.join('\n');
 }
 
@@ -94,26 +94,26 @@ for (let i = 0; i < pages; i++) {
 async function runBenchmark(engineMode) {
   return new Promise((resolve) => {
     const env = { ...process.env, FASTMD_RS: engineMode };
-    
+
     const startTime = performance.now();
-    const child = spawn('node', [join(__dirname, 'transform-test.mjs'), ...files], { 
+    const child = spawn('node', [join(__dirname, 'transform-test.mjs'), ...files], {
       env,
       stdio: 'pipe'
     });
-    
+
     let output = '';
     child.stdout.on('data', (data) => {
       output += data.toString();
     });
-    
+
     child.stderr.on('data', (data) => {
       console.error(`[${engineMode}] Error:`, data.toString());
     });
-    
+
     child.on('close', (code) => {
       const endTime = performance.now();
       const duration = endTime - startTime;
-      
+
       resolve({
         engine: engineMode,
         duration,
@@ -127,26 +127,26 @@ async function runBenchmark(engineMode) {
 // Main benchmark
 async function main() {
   const results = [];
-  
+
   // Run JS baseline
   console.log('Running JS baseline...');
   const jsResult = await runBenchmark('off');
   results.push(jsResult);
-  
+
   // Run Sidecar if requested
   if (engine === 'sidecar' || engine === 'all') {
     console.log('Running Sidecar engine...');
     const sidecarResult = await runBenchmark('sidecar');
     results.push(sidecarResult);
   }
-  
+
   // Run WASM if requested
   if (engine === 'wasm' || engine === 'all') {
     console.log('Running WASM engine...');
     const wasmResult = await runBenchmark('wasm');
     results.push(wasmResult);
   }
-  
+
   // Output results in NDJSON format
   console.log('\n=== Results (NDJSON) ===');
   for (const result of results) {
@@ -161,7 +161,7 @@ async function main() {
     };
     console.log(JSON.stringify(output));
   }
-  
+
   // Summary table
   console.log('\n=== Summary ===');
   console.log('Engine     | Duration (ms) | Status');
@@ -171,10 +171,10 @@ async function main() {
       `${result.engine.padEnd(10)} | ${result.duration.toFixed(2).padStart(13)} | ${result.success ? '✓' : '✗'}`
     );
   }
-  
+
   // Calculate speedup
   if (results.length > 1) {
-    const baseline = results.find(r => r.engine === 'off');
+    const baseline = results.find((r) => r.engine === 'off');
     console.log('\n=== Speedup vs JS ===');
     for (const result of results) {
       if (result.engine !== 'off') {
@@ -186,7 +186,7 @@ async function main() {
       }
     }
   }
-  
+
   // Cleanup
   rmSync(testDir, { recursive: true, force: true });
 }

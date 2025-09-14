@@ -1,0 +1,66 @@
+---
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'Fast MD-X Documentation' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} | Fast MD-X</title>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --color-bg: #ffffff;
+    --color-text: #1a1a1a;
+    --color-primary: #4f46e5;
+    --color-secondary: #6366f1;
+    --color-border: #e5e7eb;
+    --color-code-bg: #f3f4f6;
+    --color-code-text: #374151;
+    --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-bg: #0f0f0f;
+      --color-text: #e5e7eb;
+      --color-primary: #818cf8;
+      --color-secondary: #a5b4fc;
+      --color-border: #374151;
+      --color-code-bg: #1f2937;
+      --color-code-text: #d1d5db;
+    }
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--color-text);
+    background-color: var(--color-bg);
+  }
+
+  body {
+    min-height: 100vh;
+  }
+</style>

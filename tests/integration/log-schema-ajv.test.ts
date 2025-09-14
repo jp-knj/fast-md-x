@@ -58,14 +58,14 @@ describe('fastmd-cache: NDJSON schema (Ajv, strict)', () => {
     }
 
     const seen = new Set<string>();
-    for (const r of rows as any[]) {
+    for (const r of rows as unknown[]) {
       const ok = validate(r);
       if (!ok) {
         // For debugging: attach readable error message
         const msg = ajv.errorsText(validate.errors, { separator: '\n' });
         throw new Error(`schema validation failed:\n${msg}\nrow=${JSON.stringify(r)}`);
       }
-      seen.add((r as any).evt);
+      seen.add((r as { evt: string }).evt);
     }
     expect(seen.has('cache_miss')).toBe(true);
     expect(seen.has('cache_write')).toBe(true);
