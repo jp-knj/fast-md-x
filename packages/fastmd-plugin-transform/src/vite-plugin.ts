@@ -5,12 +5,11 @@ import {
   RPC_METHODS,
   type RpcRequest,
   type RpcResponse,
-  type TransformRequest,
-  type TransformResponse,
   createDeferred,
   createRpcRequest,
   generateRequestId
 } from '@fastmd/shared';
+import type { TransformRequest, TransformResponse } from '@fastmd/shared/protocol';
 import matter from 'gray-matter';
 import type { Plugin } from 'vite';
 import type {
