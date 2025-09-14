@@ -53,4 +53,15 @@ declare module '@fastmd/shared' {
   export function createDeferred<T>(): Deferred<T>;
   export function createRpcRequest(id: RpcId, method: string, params?: unknown): RpcRequest;
   export function generateRequestId(): string;
+  export interface TransformRequest {
+    file: string;
+    content: string;
+    options?: { mode?: 'development' | 'production'; sourcemap?: boolean; framework?: 'astro' | 'vite' };
+  }
+  export interface TransformResponse {
+    code: string;
+    map?: unknown;
+    metadata?: Record<string, unknown>;
+    dependencies?: string[];
+  }
 }
