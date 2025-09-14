@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./astro-integration": {
+      "types": "./dist/astro-integration.d.ts",
+      "import": "./dist/astro-integration.js"
+    },
     "./transform-pipeline": {
       "types": "./dist/transform-pipeline.d.ts",
       "import": "./dist/transform-pipeline.js"
@@ -25,7 +29,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@fastmd/shared": "workspace:*",
+    "@fastmd/shared": "^0.1.0",
     "gray-matter": "^4.0.3",
     "unist-util-visit": "^5.0.0"
   },
@@ -36,6 +40,20 @@
     "vite": "^6.0.0"
   },
   "peerDependencies": {
-    "vite": ">=4.0.0"
-  }
+    "vite": ">=4.0.0",
+    "astro": ">=4.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false
 }
