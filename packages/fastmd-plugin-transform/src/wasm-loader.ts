@@ -64,7 +64,7 @@ async function loadWasmModuleInternal(): Promise<WasmModule> {
 
     // Initialize the WASM module with the binary
     const wasmBinary = await fetch(wasmPath).then((r) => r.arrayBuffer());
-    const wasmModuleWithDefault = wasmModule as {
+    const wasmModuleWithDefault = wasmModule as unknown as {
       default?: (binary: ArrayBuffer) => Promise<void>;
     };
     if (typeof wasmModuleWithDefault.default === 'function') {
