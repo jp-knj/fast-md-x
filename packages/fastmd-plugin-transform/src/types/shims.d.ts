@@ -2,9 +2,9 @@
 
 // unified is used for Plugin typing only; provide a lightweight alias.
 declare module 'unified' {
-  export type Plugin<Params extends any[] = any[], Tree = unknown> = (
-    ...args: any
-  ) => any;
+  export type Plugin<Params extends unknown[] = unknown[], Tree = unknown> = (
+    ...args: Params
+  ) => unknown;
 }
 
 // vfile type is used to read path/history/value in tests.
@@ -13,15 +13,15 @@ declare module 'vfile' {
     value?: unknown;
     path?: string;
     history?: string[];
-    data?: Record<string, any>;
+    data?: Record<string, unknown>;
   }
-  export { VFile };
+  export type { VFile };
   export default VFile;
 }
 
 // Local dev WASM loader path; declare as any to avoid compile-time resolution.
 declare module '../../../native/fastmd-native/pkg/fastmd_native.js' {
-  const mod: any;
+  const mod: unknown;
   export default mod;
 }
 
@@ -32,23 +32,39 @@ declare module '../../../native/fastmd-native/pkg/fastmd_native_bg.wasm' {
 
 // Fallback wildcard for local native dev paths
 declare module '../../../native/*' {
-  const anyModule: any;
+  const anyModule: unknown;
   export default anyModule;
 }
 
 // Optional workspace package not always present in CI
 declare module '@fastmd/native' {
-  const anyModule: any;
+  const anyModule: unknown;
   export default anyModule;
 }
 
 // Minimal surface for @fastmd/shared used by vite-plugin
 declare module '@fastmd/shared' {
   export type RpcId = string | number;
-  export interface RpcRequest { id: RpcId; method: string; params?: unknown }
-  export interface RpcError { code: number; message: string; data?: unknown }
-  export interface RpcResponse { id: RpcId; result?: unknown; error?: RpcError }
-  export interface Deferred<T> { promise: Promise<T>; resolve(v: T): void; reject(e: any): void }
+  export interface RpcRequest {
+    id: RpcId;
+    method: string;
+    params?: unknown;
+  }
+  export interface RpcError {
+    code: number;
+    message: string;
+    data?: unknown;
+  }
+  export interface RpcResponse {
+    id: RpcId;
+    result?: unknown;
+    error?: RpcError;
+  }
+  export interface Deferred<T> {
+    promise: Promise<T>;
+    resolve(v: T): void;
+    reject(e: unknown): void;
+  }
   export const RPC_METHODS: { TRANSFORM: string };
   export function createDeferred<T>(): Deferred<T>;
   export function createRpcRequest(id: RpcId, method: string, params?: unknown): RpcRequest;
@@ -56,7 +72,11 @@ declare module '@fastmd/shared' {
   export interface TransformRequest {
     file: string;
     content: string;
-    options?: { mode?: 'development' | 'production'; sourcemap?: boolean; framework?: 'astro' | 'vite' };
+    options?: {
+      mode?: 'development' | 'production';
+      sourcemap?: boolean;
+      framework?: 'astro' | 'vite';
+    };
   }
   export interface TransformResponse {
     code: string;
