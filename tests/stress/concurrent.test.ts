@@ -396,24 +396,27 @@ describe('Stress Tests: Concurrent Processing', () => {
 
 describe('Stress Tests: System Limits', () => {
   test('respects system resource limits', async () => {
-    const cpuCount = os.cpus().length;
+    // Guard against sandboxed environments that may report 0 CPUs / very low free mem
+    const cpuCountRaw = os.cpus().length;
+    const cpuCount = Math.max(1, cpuCountRaw);
     const totalMemory = os.totalmem() / (1024 * 1024 * 1024); // GB
-    const freeMemory = os.freemem() / (1024 * 1024 * 1024); // GB
+    const freeMemory = Math.max(0.25, os.freemem() / (1024 * 1024 * 1024)); // GB (floor at 0.25GB)
 
     console.log(
       `System: ${cpuCount} CPUs, ${totalMemory.toFixed(1)}GB total, ${freeMemory.toFixed(1)}GB free`
     );
 
     // Test should adapt to system resources
-    const maxWorkers = Math.min(cpuCount * 2, 16);
-    const maxMemoryMB = Math.min(freeMemory * 1024 * 0.5, 2048); // Use max 50% of free memory
+    const maxWorkers = Math.max(1, Math.min(cpuCount * 2, 16));
+    const maxMemoryMB = Math.max(64, Math.min(freeMemory * 1024 * 0.5, 2048)); // 50% of free, min 64MB
 
     const sidecar = new MockSidecar();
     await sidecar.start();
+    const startUsedMB = process.memoryUsage().heapUsed / (1024 * 1024);
 
     // Simulate resource-aware processing
-    const fileCount = Math.min(1000, maxMemoryMB * 10); // Adjust based on memory
-    const batchSize = Math.max(10, Math.floor(fileCount / maxWorkers));
+    const fileCount = Math.min(1000, Math.floor(maxMemoryMB) * 10); // Adjust based on memory
+    const batchSize = Math.max(10, Math.floor(fileCount / maxWorkers) || 10);
 
     const start = performance.now();
 
@@ -429,7 +432,9 @@ describe('Stress Tests: System Limits', () => {
     const throughput = fileCount / (duration / 1000);
 
     expect(throughput).toBeGreaterThan(25); // Reasonable throughput (lower threshold for CI)
-    // Allow 2x memory usage for test overhead
-    expect(process.memoryUsage().heapUsed / (1024 * 1024)).toBeLessThan(maxMemoryMB * 2);
+    // Compare memory increase instead of absolute, allow headroom for CI
+    const usedNowMB = process.memoryUsage().heapUsed / (1024 * 1024);
+    const increaseMB = usedNowMB - startUsedMB;
+    expect(increaseMB).toBeLessThan(Math.max(64, maxMemoryMB));
   });
 });
